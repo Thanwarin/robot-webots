@@ -1,0 +1,203 @@
+"""
+Module: LH/LM Intelligent Robotics (30227,30244)
+
+    Name: C. Shi， S.Wang
+Coursework: Emotion Control Implementation
+Date: 2/12/2025
+
+Note: Run webots first, then run this script.
+"""
+
+from controller import Robot, Keyboard
+import socket
+import select
+import json
+import math
+import sys
+
+# --- Constants ---
+# UDP_PORT = 8888 # conflict in lab
+UDP_PORT = 5005 
+TIME_STEP = 32
+MAX_SPEED = 4.0
+
+# 调参记录：0.1太快了，机器人会抖，0.05又太慢，尝试一下 0.08.
+# Tuned in lab session, 0.08 seems stable.
+SMOOTH_FACTOR = 0.08 
+
+AUTO_RESET_TIME = 3.0 
+
+class NaoController:
+    def __init__(self):
+        # Initialise Robot
+        self.robot = Robot()
+        self.keyboard = Keyboard()
+        self.keyboard.enable(TIME_STEP)
+        
+        # Initialise Network (UDP)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            self.sock.bind(("0.0.0.0", UDP_PORT))
+            self.sock.setblocking(False)
+            # print(f"Server started on port {UDP_PORT}...") 
+            print(f"UDP ready at {UDP_PORT}, waiting for python script...")
+        except Exception as e:
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print("Port bind was failed! What! Is the port busy again?")
+            print("Try changing UDP_PORT at the top of the file.")
+            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print(e)
+            
+        self.motors = {} 
+        self.current_positions = {} 
+        
+        # Joint names definition
+        self.joint_names = [
+            'HeadYaw', 'HeadPitch',
+            'RShoulderPitch', 'LShoulderPitch', 'RShoulderRoll', 'LShoulderRoll',
+            'LHipPitch', 'RHipPitch', 'LHipRoll', 'RHipRoll', 
+            'LKneePitch', 'RKneePitch',
+            'LAnklePitch', 'RAnklePitch'
+        ]
+
+        # Enable motors
+        for name in self.joint_names:
+            motor = self.robot.getDevice(name)
+            if motor:
+                self.motors[name] = motor
+                motor.setVelocity(MAX_SPEED)
+                motor.setPosition(0.0) # Reset position
+                self.current_positions[name] = 0.0
+            else:
+                # print(f"Warning: Device {name} not found!") 
+                pass # ignore for now
+        
+        self.target_emotion = "Neutral"     
+        self.last_input_time = 0.0
+        
+        print("System initialised.")
+
+    def check_inputs(self, current_time):       
+        new_cmd = None
+        
+        # Check UDP packet
+        try:
+            readable, _, _ = select.select([self.sock], [], [], 0)
+            if readable:
+                data, _ = self.sock.recvfrom(1024)
+                # print("Received:", data) # debug
+                msg = json.loads(data.decode('utf-8'))
+                if "emotion" in msg: 
+                    new_cmd = msg["emotion"]
+        except: 
+            pass # ignore errors
+
+        # Keyboard control for testing (backup plan)
+        k = self.keyboard.getKey()
+        if k == ord('H'): new_cmd = "Happy"
+        elif k == ord('A'): new_cmd = "Angry"
+        elif k == ord('S'): new_cmd = "Sad"
+        elif k == ord('N'): new_cmd = "Neutral"
+
+        if new_cmd:
+            self.last_input_time = current_time
+            if new_cmd != self.target_emotion:
+                print(f"Mode switch: {self.target_emotion} -> {new_cmd}")
+            self.target_emotion = new_cmd
+
+    def get_target_angles(self, t):
+        targets = {}
+        
+        # Base pose (Standard standing posture)
+        # 别改这里，不然机器人容易倒
+        # Don't touch or change these, balance is unknow!
+        base_knee = 0.7
+        base_hip = -0.35
+        base_ankle = -0.35
+        
+        targets['LKneePitch'] = base_knee
+        targets['RKneePitch'] = base_knee
+        targets['LHipPitch'] = base_hip
+        targets['RHipPitch'] = base_hip
+        targets['LAnklePitch'] = base_ankle
+        targets['RAnklePitch'] = base_ankle
+        
+        # Default arms
+        targets['LShoulderPitch'] = 1.5
+        targets['RShoulderPitch'] = 1.5
+        targets['LShoulderRoll'] = 0.0
+        targets['RShoulderRoll'] = 0.0
+        targets['HeadPitch'] = 0.0
+        targets['HeadYaw'] = 0.0
+        
+        # Behaviour Logic
+        if self.target_emotion == "Happy":
+            # Action: Hands up and wave
+            freq = 3.0
+            wave = -1.6 + 0.3 * math.sin(t * freq)
+            targets['LShoulderPitch'] = wave
+            targets['RShoulderPitch'] = wave
+            targets['LShoulderRoll'] = 0.3
+            targets['RShoulderRoll'] = -0.3
+            targets['HeadPitch'] = -0.2
+
+        elif self.target_emotion == "Angry":
+            # Action: Shake head fast
+            freq = 6.0
+            targets['HeadYaw'] = 0.5 * math.sin(t * freq)
+            targets['LShoulderPitch'] = 1.8 # stiff arms
+            targets['RShoulderPitch'] = 1.8
+            targets['LHipPitch'] = -0.45 # lean forward
+            targets['RHipPitch'] = -0.45
+
+        elif self.target_emotion == "Sad":
+            # Action: Look down
+            freq = 1.0
+            targets['HeadPitch'] = 0.5
+            targets['HeadYaw'] = 0.1 * math.sin(t * freq) # slight movement
+            # targets['LHipPitch'] = -0.5 # 之前的参数不太好，看起来像是要摔啊
+            targets['LHipPitch'] = -0.5 
+            targets['RHipPitch'] = -0.5
+            targets['LShoulderPitch'] = 1.3
+            targets['RShoulderPitch'] = 1.3
+
+        return targets
+
+    def run(self):
+        # Warm up steps
+        for i in range(20):
+            self.robot.step(TIME_STEP)
+        
+        print("Start main loop...")
+        
+        while self.robot.step(TIME_STEP) != -1:
+            t = self.robot.getTime()
+            
+            self.check_inputs(t)
+            
+            # Auto reset logic
+            if self.target_emotion != "Neutral":
+                if (t - self.last_input_time) > AUTO_RESET_TIME:
+                    # print("timeout reset") 
+                    self.target_emotion = "Neutral"
+            
+            target_dict = self.get_target_angles(t)
+            
+            # Update motors
+            for name, motor in self.motors.items():
+                if name in target_dict:
+                    target_val = target_dict[name]
+                    current_val = self.current_positions[name]
+                    
+                    # Smooth filtering function
+                    new_val = current_val + (target_val - current_val) * SMOOTH_FACTOR
+                    
+                    self.current_positions[name] = new_val
+                    motor.setPosition(new_val)
+
+if __name__ == "__main__":
+    controller = NaoController()
+    try:
+        controller.run()
+    except KeyboardInterrupt:
+        print("Stopped by user.")
