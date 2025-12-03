@@ -1,0 +1,321 @@
+"""
+Module: LH/LM Intelligent Robotics (30227,30244)
+Name: C. Shi， S.Wang
+Date: 03/12/2025
+
+Note：我添加了一个有关机器人的缓冲，这样就不会摔了，哎
+Note：I add a buffer state (Preparing) to stop robot falling
+"""
+
+from controller import Supervisor, Keyboard, Motion
+import cv2
+import numpy as np
+import socket
+import select
+import json
+import math
+import os
+
+# --- Constants ---
+# Use 5005 port because the world have more than 5005 race
+UDP_PORT = 5005
+TIME_STEP = 32
+MAX_SPEED = 4.0
+# The value 0.08 is test many times in our project that it is perfect and 0.1 is too shake for the data
+SMOOTH_FACTOR = 0.08
+
+# Time setting (second)
+TIME_PREPARE = 1.0    # buffer time， let robot stand still first
+TIME_ACTING = 3.0     
+TIME_RESETTING = 2.0  # Come on! time to go back to normal stand
+SAFE_DISTANCE = 0.45 
+
+# Path for motion files
+# Remember to change this path if run on another computer!!
+MOTION_PATH = "E:/Webots/projects/robots/softbank/nao/motions/"
+
+class NaoController:
+    def __init__(self):
+        # Initialise the robot supervisor
+        self.robot = Supervisor()
+        self.keyboard = Keyboard()
+        self.keyboard.enable(TIME_STEP)
+        
+        # Initialise Network
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            self.sock.bind(("0.0.0.0", UDP_PORT))
+            self.sock.setblocking(False)
+        except: 
+            print("Socket bind failed... maybe port is busy.")
+            pass
+
+        # Open the camera device
+        self.camera = self.robot.getDevice("CameraTop")
+        self.camera.enable(TIME_STEP)
+        self.cam_w = self.camera.getWidth()
+        self.cam_h = self.camera.getHeight()
+
+        # Sonar sensors for obstacle avoid
+        self.sonar_l = self.robot.getDevice("Sonar/Left")
+        self.sonar_r = self.robot.getDevice("Sonar/Right")
+        self.sonar_l.enable(TIME_STEP)
+        self.sonar_r.enable(TIME_STEP)
+
+        self.motors = {}
+        self.current_positions = {} 
+        
+        # All joints name list
+        self.joint_names = [
+            'HeadYaw', 'HeadPitch',
+            'RShoulderPitch', 'LShoulderPitch', 'RShoulderRoll', 'LShoulderRoll',
+            'LHipPitch', 'RHipPitch', 'LHipRoll', 'RHipRoll', 
+            'LKneePitch', 'RKneePitch',
+            'LAnklePitch', 'RAnklePitch'
+        ]
+
+        # Get motor devices
+        for name in self.joint_names:
+            motor = self.robot.getDevice(name)
+            if motor:
+                self.motors[name] = motor
+                motor.setVelocity(MAX_SPEED)
+                motor.setPosition(0.0)
+                self.current_positions[name] = 0.0
+            else:
+                # print("Motor not found: " + name)
+                pass
+
+        self.loaded_motions = {}
+        self.load_all_motions()
+        self.active_motion = None 
+
+        # State Machine Logic:
+        # STARTUP -> PATROL -> PREPARING -> ACTING -> RESETTING
+        # PREPARING is the new， ensure NAO robot stop walking before act.
+        self.state = "STARTUP" 
+        self.target_emotion = "Neutral"
+        self.state_timer = 0.0
+        
+        print("System initialised. Buffer time is enabled.")
+
+    def load_all_motions(self):
+        # Dictionary for walk motions
+        files = {"Forward": "Forwards.motion", "Left": "TurnLeft40.motion"}
+        for key, filename in files.items():
+            full_path = os.path.join(MOTION_PATH, filename)
+            if os.path.exists(full_path):
+                self.loaded_motions[key] = Motion(full_path)
+            else:
+                print("Cannot find motion file: " + filename)
+
+    def get_sonar_dist(self):
+        # Get the smaller value from left and right
+        return min(self.sonar_l.getValue(), self.sonar_r.getValue())
+
+    def check_inputs(self):
+        cmd = None
+        # Check UDP first
+        try:
+            readable, _, _ = select.select([self.sock], [], [], 0)
+            if readable:
+                data, _ = self.sock.recvfrom(1024)
+                msg = json.loads(data.decode('utf-8'))
+                if "emotion" in msg: cmd = msg["emotion"]
+        except: 
+            pass
+
+        # Check Keyboard 
+        k = self.keyboard.getKey()
+        if k == ord('H'): cmd = "Happy"
+        elif k == ord('A'): cmd = "Angry"
+        elif k == ord('S'): cmd = "Sad"
+        elif k == ord('U'): cmd = "Surprise"
+        return cmd
+
+    def play_motion_file(self, motion_name):
+        # Function to play .motion files
+        if motion_name in self.loaded_motions:
+            motion = self.loaded_motions[motion_name]
+            if self.active_motion != motion:
+                if self.active_motion: self.active_motion.stop()
+                self.active_motion = motion
+                self.active_motion.setLoop(True)
+                self.active_motion.play()
+
+    def stop_motion_file(self):
+        # Stop everything
+        if self.active_motion:
+            self.active_motion.stop()
+            self.active_motion = None
+            # Reset all current pos record
+            for name in self.joint_names:
+                self.current_positions[name] = 0.0
+
+    # Calculate angles for static pose
+    # This part is very hard for everyone and the balance is difficult.
+    def get_target_angles(self, t):
+        targets = {}
+        
+        # Base Pose (Za Ma Bu in china)
+        # Use this pose to keep stable in PREPARING and RESETTING
+        base_knee = 0.7
+        base_hip = -0.35
+        base_ankle = -0.35
+        
+        targets['LKneePitch'] = base_knee; targets['RKneePitch'] = base_knee
+        targets['LHipPitch'] = base_hip; targets['RHipPitch'] = base_hip
+        targets['LAnklePitch'] = base_ankle; targets['RAnklePitch'] = base_ankle
+        targets['LShoulderPitch'] = 1.5; targets['RShoulderPitch'] = 1.5
+        targets['LShoulderRoll'] = 0.0; targets['RShoulderRoll'] = 0.0
+        targets['HeadPitch'] = 0.0; targets['HeadYaw'] = 0.0
+
+        # If not ACTING， just return base pose to keep safe.
+        if self.state != "ACTING":
+            return targets
+
+        # Logic for Emotions
+        if self.target_emotion == "Happy":
+            # Very danger here， robot easy to fall back.
+            # So I set HipPitch to -0.55 to lean forward.
+            freq = 3.0
+            wave = -1.5 + 0.3 * math.sin(t * freq)
+            targets['LShoulderPitch'] = wave; targets['RShoulderPitch'] = wave
+            targets['LShoulderRoll'] = 0.3; targets['RShoulderRoll'] = -0.3
+            
+            targets['HeadPitch'] = 0.0 
+            
+            # Important!!!!!!!!!!!!!!!!!!!!!!!!!!!! Lean body forward
+            targets['LHipPitch'] = -0.55; targets['RHipPitch'] = -0.55
+            targets['LKneePitch'] = 0.7; targets['RKneePitch'] = 0.7
+            targets['LAnklePitch'] = -0.35; targets['RAnklePitch'] = -0.35
+
+        elif self.target_emotion == "Angry":
+            freq = 4.0
+            targets['HeadYaw'] = 0.5 * math.sin(t * freq)
+            targets['LShoulderPitch'] = 1.0; targets['RShoulderPitch'] = 1.0 
+            targets['LHipPitch'] = -0.45; targets['RHipPitch'] = -0.45 
+            targets['LKneePitch'] = 0.7; targets['RKneePitch'] = 0.7
+            targets['LAnklePitch'] = -0.35; targets['RAnklePitch'] = -0.35
+
+        elif self.target_emotion == "Sad":
+            freq = 1.0
+            targets['HeadPitch'] = 0.5
+            targets['HeadYaw'] = 0.1 * math.sin(t * freq)
+            targets['LHipPitch'] = -0.35; targets['RHipPitch'] = -0.35
+            targets['LShoulderPitch'] = 1.3; targets['RShoulderPitch'] = 1.3
+
+        elif self.target_emotion == "Surprise":
+            # Also very danger beacause center of mass is high.
+            # Need deep squat (0.8) and lean forward (-0.6).
+            targets['HeadPitch'] = 0.0 
+            
+            targets['LShoulderPitch'] = 0.1; targets['RShoulderPitch'] = 0.1
+            targets['LShoulderRoll'] = 0.2; targets['RShoulderRoll'] = -0.2
+            
+            # Like skiing pose， very low
+            targets['LHipPitch'] = -0.6; targets['RHipPitch'] = -0.6
+            targets['LKneePitch'] = 0.8; targets['RKneePitch'] = 0.8
+            targets['LAnklePitch'] = -0.35; targets['RAnklePitch'] = -0.35
+
+        return targets
+
+    def smooth_move(self, target_dict):
+        # Linear interpolation to make movement smooth
+        for name, motor in self.motors.items():
+            if name in target_dict:
+                target = target_dict[name]
+                current = self.current_positions[name]
+                # new = old + (target - old) * factor
+                new_val = current + (target - current) * SMOOTH_FACTOR
+                self.current_positions[name] = new_val
+                motor.setPosition(new_val)
+
+    def run(self):
+        print("System starting...")
+        
+        while self.robot.step(TIME_STEP) != -1:
+            t = self.robot.getTime()
+            dt = TIME_STEP / 1000.0
+            
+            # Process Camera image
+            img = self.camera.getImage()
+            if img:
+                frame = np.frombuffer(img, np.uint8).reshape((self.cam_h, self.cam_w, 4))
+                try: 
+                    cv2.imshow("NAO Vision", frame[:, :, :3])
+                    cv2.waitKey(1)
+                except: 
+                    pass
+
+            new_cmd = self.check_inputs()
+
+            # --- State Machine ---
+            if self.state == "STARTUP":
+                # Wait 2 seconds for robot to stable
+                self.state_timer += dt
+                target_dict = self.get_target_angles(t)
+                self.smooth_move(target_dict)
+                if self.state_timer > 2.0:
+                    print("Patrol mode on.")
+                    self.state = "PATROL"
+                    self.state_timer = 0
+
+            elif self.state == "PATROL":
+                # Walking mode
+                if new_cmd and new_cmd != "Neutral":
+                    print("Get command: " + new_cmd + ". Braking now...")
+                    self.stop_motion_file() # Stop walking file
+                    self.target_emotion = new_cmd
+                    self.state = "PREPARING" # Go to buffer state
+                    self.state_timer = 0
+                    continue 
+                
+                dist = self.get_sonar_dist()
+                if dist < SAFE_DISTANCE:
+                    self.play_motion_file("Left")
+                else:
+                    self.play_motion_file("Forward")
+
+            elif self.state == "PREPARING":
+                # This state is to stop inertia.
+                # Just stand still (Za Ma Bu in china) for 1s.
+                self.state_timer += dt
+                
+                target_dict = self.get_target_angles(t)
+                self.smooth_move(target_dict)
+                
+                if self.state_timer > TIME_PREPARE:
+                    print("Start action: " + self.target_emotion)
+                    self.state = "ACTING"
+                    self.state_timer = 0
+
+            elif self.state == "ACTING":
+                # Play emotion animation
+                self.state_timer += dt
+                target_dict = self.get_target_angles(t)
+                self.smooth_move(target_dict)
+                
+                if self.state_timer > TIME_ACTING:
+                    print("Action finish. Resetting...")
+                    self.state = "RESETTING"
+                    self.state_timer = 0
+
+            elif self.state == "RESETTING":
+                # Go back to safe pose slowly
+                self.state_timer += dt
+                target_dict = self.get_target_angles(t)
+                self.smooth_move(target_dict)
+                
+                if self.state_timer > TIME_RESETTING:
+                    print("Back to Patrol.")
+                    self.state = "PATROL"
+                    self.target_emotion = "Neutral"
+                    self.state_timer = 0
+
+if __name__ == "__main__":
+    controller = NaoController()
+    try:
+        controller.run()
+    except KeyboardInterrupt:
+        pass
