@@ -1,0 +1,119 @@
+"""
+Module: LH/LM Intelligent Robotics (30227,30244)
+Name: C. Shi， S. Wang
+Date: 04/12/2025
+
+Note: In order to custom Environment for RL training
+"""
+
+import gymnasium as gym
+from gymnasium import spaces
+import numpy as np
+import random
+
+
+class NaoDecisionEnv(gym.Env):
+    def __init__(self):
+        super(NaoDecisionEnv, self).__init__()
+
+        # Action space: AI choose from 5 actions
+        self.action_space = spaces.Discrete(5)
+
+        # Observation space: AI see 5 emotions
+        self.observation_space = spaces.Discrete(5)
+
+        self.current_obs = 0
+        # set episode length to 50
+        self.steps_left = 50
+
+    def reset(self, seed=None, options=None):
+        # This line is from tutorial
+        super().reset(seed=seed)
+
+        # Random generate a start emotion
+        self.current_obs = random.randint(0, 4)
+        self.steps_left = 50
+
+        return self.current_obs, {}
+
+    def step(self, action):
+        reward = 0
+
+        # --- Reward Function ---
+        # Note：The teacher said this is the key point for the report.
+        # If action is same as observation， means robot understand the emotion.
+        if action == self.current_obs:
+            reward = 10  # Match right， give high reward
+        else:
+            reward = -10  # Match wrong， punish it
+
+        # Randomly switch to next emotion for training
+        self.current_obs = random.randint(0, 4)
+
+        self.steps_left -= 1
+
+        terminated = False
+        if self.steps_left <= 0:
+            terminated = True
+
+        # gymnasium needs 5 return values (obs, reward, term, trunc, info)
+        return self.current_obs, reward, terminated, False, {}"""
+Module: LH/LM Intelligent Robotics (30227,30244)
+Name: C. Shi， S. Wang
+Date: 04/12/2025
+
+Note: In order to custom Environment for RL training
+"""
+
+import gymnasium as gym
+from gymnasium import spaces
+import numpy as np
+import random
+
+
+class NaoDecisionEnv(gym.Env):
+    def __init__(self):
+        super(NaoDecisionEnv, self).__init__()
+
+        # Action space: AI choose from 5 actions
+        self.action_space = spaces.Discrete(5)
+
+        # Observation space: AI see 5 emotions
+        self.observation_space = spaces.Discrete(5)
+
+        self.current_obs = 0
+        # set episode length to 50
+        self.steps_left = 50
+
+    def reset(self, seed=None, options=None):
+        # This line is from tutorial
+        super().reset(seed=seed)
+
+        # Random generate a start emotion
+        self.current_obs = random.randint(0, 4)
+        self.steps_left = 50
+
+        return self.current_obs, {}
+
+    def step(self, action):
+        reward = 0
+
+        # --- Reward Function ---
+        # Note：The teacher said this is the key point for the report.
+        # If action is same as observation， means robot understand the emotion.
+        if action == self.current_obs:
+            reward = 10  # Match right， give high reward
+        else:
+            reward = -10  # Match wrong， punish it
+
+        # Randomly switch to next emotion for training
+        self.current_obs = random.randint(0, 4)
+
+        self.steps_left -= 1
+
+        terminated = False
+        if self.steps_left <= 0:
+            terminated = True
+
+        # gymnasium needs 5 return values (obs, reward, term, trunc, info)
+        return self.current_obs, reward, terminated, False, {}
