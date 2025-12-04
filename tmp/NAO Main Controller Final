@@ -1,0 +1,346 @@
+"""
+Module: ELEC-M-55 Intelligent Robotics
+Student: C. Shi， S. Wang
+Date: 04/12/2025
+
+"""
+
+import os
+
+# Global setting.
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' 
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
+from controller import Supervisor, Keyboard, Motion
+import numpy as np
+import socket
+import select
+import json
+import math
+import cv2
+
+# Configuration
+class Config:
+    # Network
+    UDP_IP = "0.0.0.0"
+    UDP_PORT = 5005
+    
+    # Physics
+    TIME_STEP = 32
+    MAX_SPEED = 4.0
+    
+    # 0.12 is tested best. 
+    SMOOTH_FACTOR = 0.12
+    
+    # Timers (Second)
+    T_PREPARE = 0.5
+    T_ACT = 3.0
+    T_RESET = 1.5
+    
+    # Paths
+    MOTION_DIR = "E:/Webots/projects/robots/softbank/nao/motions/"
+
+    # RL Model Names
+    MODEL_LIST = ["nao_6emo_policy", "nao_brain_rl", "nao_rl_policy"]
+
+
+# Hardware Driver
+class NaoDriver:
+    def __init__(self):
+        self.robot = Supervisor()
+        self.keyboard = Keyboard()
+        self.keyboard.enable(Config.TIME_STEP)
+        
+        # Init Sensors
+        self.cam = self.robot.getDevice("CameraTop")
+        self.cam.enable(Config.TIME_STEP)
+        self.cam_w = self.cam.getWidth()
+        self.cam_h = self.cam.getHeight()
+        
+        self.sonar_l = self.robot.getDevice("Sonar/Left")
+        self.sonar_r = self.robot.getDevice("Sonar/Right")
+        self.sonar_l.enable(Config.TIME_STEP)
+        self.sonar_r.enable(Config.TIME_STEP)
+        
+        # Init Motors
+        self.motors = {}
+        self.joints = {} # Record current position
+        
+        # Define joints name list
+        self.names = [
+            'HeadYaw', 'HeadPitch',
+            'RShoulderPitch', 'LShoulderPitch', 'RShoulderRoll', 'LShoulderRoll',
+            'LHipPitch', 'RHipPitch', 'LHipRoll', 'RHipRoll', 
+            'LKneePitch', 'RKneePitch',
+            'LAnklePitch', 'RAnklePitch'
+        ]
+        
+        for n in self.names:
+            m = self.robot.getDevice(n)
+            if m:
+                m.setVelocity(Config.MAX_SPEED)
+                m.setPosition(0.0)
+                self.motors[n] = m
+                self.joints[n] = 0.0
+        
+        # Motion files
+        self.motions = {}
+        self._load_motions()
+        self.active_motion = None
+
+    def _load_motions(self):
+        # Private function to load .motion files
+        files = {"Forward": "Forwards.motion", "Left": "TurnLeft40.motion"}
+        for k, v in files.items():
+            p = os.path.join(Config.MOTION_DIR, v)
+            if os.path.exists(p):
+                self.motions[k] = Motion(p)
+            else:
+                print("Error: Motion missing -> " + v)
+
+    # Basic Actions
+    def walk(self, direction="Forward"):
+        # Play motion file
+        if direction in self.motions:
+            m = self.motions[direction]
+            if self.active_motion != m:
+                if self.active_motion: self.active_motion.stop()
+                self.active_motion = m
+                self.active_motion.setLoop(True)
+                self.active_motion.play()
+    
+    def stop_walk(self):
+        if self.active_motion:
+            self.active_motion.stop()
+            self.active_motion = None
+            # Reset joints record to 0 to avoid jump
+            for n in self.names:
+                self.joints[n] = 0.0
+
+    def set_pose(self, target_angles):
+        # Smooth movement function
+        # 数据：新的 = 现在的 + （目标要求的 - 现在的） * 影响因数
+        for name, angle in target_angles.items():
+            if name in self.motors:
+                curr = self.joints[name]
+                new_val = curr + (angle - curr) * Config.SMOOTH_FACTOR
+                self.joints[name] = new_val
+                self.motors[name].setPosition(new_val)
+
+    def get_sonar(self):
+        return min(self.sonar_l.getValue(), self.sonar_r.getValue())
+
+    def show_camera(self):
+        # OpenCV window
+        raw = self.cam.getImage()
+        if raw:
+            img = np.frombuffer(raw, np.uint8).reshape((self.cam_h, self.cam_w, 4))
+            try:
+                cv2.imshow("RobotVision", img[:,:,:3])
+                cv2.waitKey(1)
+            except: pass
+
+
+# Logic Conroller
+# RL, Network and State Machine
+class MainController:
+    def __init__(self):
+        print("Initialising Driver...")
+        self.driver = NaoDriver()
+        
+        # Networking
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            self.sock.bind((Config.UDP_IP, Config.UDP_PORT))
+            self.sock.setblocking(False)
+        except:
+            print("Socket Error! Port busy?")
+
+        # RL Model
+        self.model = self._try_load_rl()
+        
+        # State Machine
+        self.state = "STARTUP"
+        self.timer = 0.0
+        self.target_emo = "Neutral"
+        self.obs_id = 0
+
+        print("System Ready. Waiting for command.")
+
+    def _try_load_rl(self):
+        # To avoid global error
+        try:
+            from stable_baselines3 import PPO
+            for name in Config.MODEL_LIST:
+                if os.path.exists(name + ".zip"):
+                    print("RL Brain Found: " + name)
+                    return PPO.load(name)
+        except:
+            print("Warning: No RL library or model found.")
+        return None
+
+    def _get_network_cmd(self):
+        # Read UDP buffer
+        try:
+            while True:
+                r, _, _ = select.select([self.sock], [], [], 0)
+                if not r: break
+                data, _ = self.sock.recvfrom(1024)
+                js = json.loads(data.decode('utf-8'))
+                
+                # Logic to parse message
+                if "rl_id" in js: 
+                    self.obs_id = int(js["rl_id"])
+                elif "emotion" in js:
+                    # Manual map if RL id is missing
+                    m = {"Neutral":0, "Happy":1, "Angry":2, "Sad":3, "Surprise":4, "Fear":5}
+                    self.obs_id = m.get(js["emotion"], 0)
+        except: pass
+        
+        # Keyboard Override
+        k = self.driver.keyboard.getKey()
+        if k == ord('H'): self.obs_id = 1
+        elif k == ord('A'): self.obs_id = 2
+        elif k == ord('S'): self.obs_id = 3
+        elif k == ord('U'): self.obs_id = 4
+        elif k == ord('F'): self.obs_id = 5 # Fear
+        
+        # RL Prediction
+        if self.model:
+            act, _ = self.model.predict(self.obs_id, deterministic=True)
+            return int(act)
+        else:
+            return self.obs_id # Bypass if no model
+
+    def _calc_balance_pose(self, t):
+        # Anti-Fall
+        
+        tgts = {}
+        # Default Stand
+        base_k = 0.85; base_h = -0.45; base_a = -0.4
+        tgts['LKneePitch']=base_k; tgts['RKneePitch']=base_k
+        tgts['LHipPitch']=base_h; tgts['RHipPitch']=base_h
+        tgts['LAnklePitch']=base_a; tgts['RAnklePitch']=base_a
+        tgts['LShoulderPitch']=1.5; tgts['RShoulderPitch']=1.5
+        
+        # If just walking or standing, return base pose
+        if self.state != "ACTING": return tgts
+
+        # Emotion 
+        # Happy: Lean forward to balance hands up
+        if self.target_emo == "Happy":
+            w = -1.5 + 0.3 * math.sin(t * 3.0)
+            tgts['LShoulderPitch']=w; tgts['RShoulderPitch']=w
+            tgts['LShoulderRoll']=0.3; tgts['RShoulderRoll']=-0.3
+            tgts['LHipPitch']=-0.6; tgts['RHipPitch']=-0.6 # Lean!
+        
+        # Angry: Shake head
+        elif self.target_emo == "Angry":
+            tgts['HeadYaw'] = 0.5 * math.sin(t * 4.0)
+            tgts['LShoulderPitch']=1.0; tgts['RShoulderPitch']=1.0
+            tgts['LHipPitch']=-0.55; tgts['RHipPitch']=-0.55
+            
+        # Sad: Look down
+        elif self.target_emo == "Sad":
+            tgts['HeadPitch'] = 0.5
+            tgts['LShoulderPitch']=1.3; tgts['RShoulderPitch']=1.3
+        
+        # Surprise: Deep squat (Safety),easy to fell and then need change
+        elif self.target_emo == "Surprise":
+            tgts['LShoulderPitch']=0.1; tgts['RShoulderPitch']=0.1
+            tgts['LShoulderRoll']=0.2; tgts['RShoulderRoll']=-0.2
+            tgts['LHipPitch']=-0.75; tgts['RHipPitch']=-0.75
+            tgts['LKneePitch']=1.0; tgts['RKneePitch']=1.0
+            
+        # Fear: Cower. It was similar with happy in the action, remove?
+        elif self.target_emo == "Fear":
+             tgts['HeadPitch']=0.2; tgts['HeadYaw']=0.3
+             tgts['LShoulderPitch']=-1.2; tgts['RShoulderPitch']=-1.2
+             tgts['LHipPitch']=-0.7; tgts['RHipPitch']=-0.7
+             
+        return tgts
+
+    def run(self):
+        # Main Loop
+        while self.driver.robot.step(Config.TIME_STEP) != -1:
+            t = self.driver.robot.getTime()
+            dt = Config.TIME_STEP / 1000.0
+            
+            # 1. Update Sensors
+            self.driver.show_camera()
+            
+            # 2. Get Brain Decision
+            action_id = self._get_network_cmd()
+            # Map ID to String
+            emap = {0:"Neutral", 1:"Happy", 2:"Angry", 3:"Sad", 4:"Surprise", 5:"Fear"}
+            cmd_str = emap.get(action_id, "Neutral")
+
+            # 3. The Logic Flow: Start up -> Patrol <-> Prepare -> Act -> Reset
+            
+            if self.state == "STARTUP":
+                self.timer += dt
+                # Just stand
+                pose = self._calc_balance_pose(t)
+                self.driver.set_pose(pose)
+                if self.timer > 2.0:
+                    print("Startup Done. Enter Patrol.")
+                    self.state = "PATROL"
+                    self.timer = 0
+
+            elif self.state == "PATROL":
+                # Check Emotion Command
+                if cmd_str != "Neutral":
+                    print("Trigger: " + cmd_str)
+                    self.driver.stop_walk() # Immediate stop
+                    self.target_emo = cmd_str
+                    self.state = "PREPARE"
+                    self.timer = 0
+                    continue
+
+                # Auto Walk
+                dist = self.driver.get_sonar()
+                if dist < 0.45: # Safe distance
+                    self.driver.walk("Left")
+                else:
+                    self.driver.walk("Forward")
+
+            elif self.state == "PREPARE":
+                # Buffer state to stop inertia
+                self.timer += dt
+                pose = self._calc_balance_pose(t)
+                self.driver.set_pose(pose)
+                if self.timer > Config.T_PREPARE:
+                    self.state = "ACTING"
+                    self.timer = 0
+
+            elif self.state == "ACTING":
+                self.timer += dt
+                pose = self._calc_balance_pose(t) # return emotion pose
+                self.driver.set_pose(pose)
+                if self.timer > Config.T_ACT:
+                    self.state = "RESETTING"
+                    self.timer = 0
+
+            elif self.state == "RESETTING":
+                self.timer += dt
+                # Return to stand pose
+                pose = self._calc_balance_pose(t) # Will return base pose
+                self.driver.set_pose(pose)
+                if self.timer > Config.T_RESET:
+                    # If command is continuous, act again. Else patrol.
+                    if cmd_str != "Neutral":
+                        self.target_emo = cmd_str
+                        self.state = "PREPARE"
+                    else:
+                        self.state = "PATROL"
+                        self.target_emo = "Neutral"
+                    self.timer = 0
+
+if __name__ == "__main__":
+    # Entry Point
+    main = MainController()
+    try:
+        main.run()
+    except KeyboardInterrupt:
+        pass
