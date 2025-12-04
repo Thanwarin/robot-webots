@@ -1,0 +1,31 @@
+"""
+Module: LH/LM Intelligent Robotics (30227,30244)
+Name: C. Shi， S. Wang
+Date: 04/12/2025
+
+Note: Run this script to train the model
+"""
+
+from stable_baselines3 import PPO
+# Import the custom env we wrote
+from nao_gym_env import NaoDecisionEnv
+import os
+
+# 1. Load Environment
+env = NaoDecisionEnv()
+
+# 2. Initialise PPO Agent
+# Teacher said PPO is good for this coursework.
+print("Init RL agent...")
+model = PPO("MlpPolicy", env, verbose=1)
+
+# 3. Start Training
+# 10000 steps is enough for simple logic， I tried 5000 but accuracy is bad.
+print("Training start...")
+model.learn(total_timesteps=10000)
+
+# 4. Save Model
+model.save("nao_rl_policy")
+print("Training finished!")
+print("Model saved as 'nao_rl_policy.zip'")
+print("Important: Copy this zip file to your Webots controller folder manually.")
