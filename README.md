@@ -28,7 +28,8 @@ This repository contains code and simulation environments for enabling a NAO hum
 2. Install required Python packages:
    ```bash
    pip install -r requirements.txt
-
+   
+```markdown
 3. Download pre-trained models:
 
 - Emotion Recognition Model: [Download here
