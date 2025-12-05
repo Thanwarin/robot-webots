@@ -9,8 +9,18 @@
 Emotion-to-Action Conversion Using a Q-Learning Model and Webots NAO Robot Motion Simulation Algorithms
 
 ## Overview
+Based on my teammate Thanwarin Luangmanotham’s final vision model and the Q-Learning training model, I upgraded the Q-Learning model by rewriting its code inside the Webots controller. After this, it could work together with her vision model. With this link, the NAO robot used the Q-table to judge and find the response value by itself. In the end, the NAO robot could recognize human facial expressions on its own and do the correct action.
 
-
+## Parameter and Code Corrections
+- **Before Updating and Reconstructing the Original Model Code:** 
+  -After loading my teammate’s original model code, the vision model could recognize six emotions (happy, fear, sad, disgust, surprise, angry). But after the robot recognized these six emotions, it could only do one body-swaying action, and then it directly entered the patrol mode.
+  -When running my teammate’s original code, the robot made the same action too often after detecting any emotion. Many times, the previous action had not finished yet, and the next action started right away. This made the robot unable to stand steadily, broke its balance, and caused the robot to fail to complete the full process.
+- **After Updating and Reconstructing the Original Model Code:**
+  -
+  
+  
+## Features
+- **Facial Emotion Recognition:** 
 
 
 
