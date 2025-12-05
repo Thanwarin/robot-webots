@@ -22,20 +22,21 @@ This repository contains code and simulation environments for enabling a NAO hum
 
 ## Getting Started
 1. Clone this repository:
-```bash
-git clone https://github.com/Thanwarin/robot-webots.git
+  ```bash
+  git clone https://github.com/Thanwarin/robot-webots.git
 
 2. Install required Python packages:
-```bash
-pip install -r requirements.txt
+  ```bash
+  pip install -r requirements.txt
+
 3. Download pre-trained models and place them in the project directory (same folder as nao_demo_python.py):
 - Emotion Recognition Model: [Download here
 ](https://drive.google.com/file/d/1b8FfnHOdwUhxmWSe27iqqs89xyuAc-bc/view?usp=sharing)
 - NAO Q-Table (Tuned): [Download here](https://drive.google.com/file/d/16vVjgt81T-OkOC9KZ-iL4VJEDAYYSj9R/view?usp=sharing)
 
 4.Launch Webots simulation and run the emotion recognition script:
-```bash
-python nao_demo_python.py
+  ```bash
+  python nao_demo_python.py
 
 Expected Behavior:
 - The NAO robot detects emotions from the webcam in real-time.
