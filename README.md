@@ -26,13 +26,13 @@ This repository contains code and simulation environments for enabling a NAO hum
    git clone https://github.com/Thanwarin/robot-webots.git
 
 2. Install required Python packages:
-```bash
-pip install -r requirements.txt
+  ```bash
+  pip install -r requirements.txt
 
 
 3. Launch Webots simulation and run the emotion recognition script:
-```bash
-python emotion_controller_webcam.py
+  ```bash
+  python emotion_controller_webcam.py
 
 ## Project Structure
 
