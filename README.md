@@ -32,7 +32,7 @@ This repository contains code and simulation environments for enabling a NAO hum
 
 3. Launch Webots simulation and run the emotion recognition script:
    ```bash
-   python emotion_controller_webcam.py
+   python controller.py
 
 ## Project Structure
 
