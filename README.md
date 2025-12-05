@@ -24,3 +24,32 @@ This repository contains code and simulation environments for enabling a NAO hum
 1. Clone this repository:
    ```bash
    git clone https://github.com/Thanwarin/robot-webots.git
+
+2. Install required Python packages:
+```bash
+pip install -r requirements.txt
+
+
+3. Launch Webots simulation and run the emotion recognition script:
+```bash
+python emotion_controller_webcam.py
+
+## Project Structure
+
+- emotion_detection_fer.ipynb: Training and testing FER model.
+
+- emotion_detection_DeepFace.ipynb: Using DeepFace for emotion recognition.
+
+- emotion_controller_webcam.py: Main controller integrating webcam input, emotion recognition, and Q-Learning action selection.
+
+- Webots world files: Contain NAO robot setup for simulation.
+
+## References
+
+- FER-2013 dataset: Goodfellow et al., 2013
+
+- Sutton, R.S. & Barto, A.G., Reinforcement Learning: An Introduction, MIT Press, 2018.
+
+- NAO robot documentation: Aldebaran Robotics, 2014.
+
+- Webots simulation: O. Michel, International Journal of Advanced Robotic Systems, 2004.
