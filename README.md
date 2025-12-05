@@ -38,7 +38,7 @@ This repository contains code and simulation environments for enabling a NAO hum
     ```bash
     python nao_demo_python.py
 
-Expected Behavior:
+## Expected Behavior:
 - The NAO robot detects emotions from the webcam in real-time.
 - Performs corresponding gestures based on the Q-Learning action policy:
 - Happy → Happy Dance
@@ -47,21 +47,19 @@ Expected Behavior:
 <img width="508" height="457" alt="happy_dance_example" src="https://github.com/user-attachments/assets/7f2b1ae7-007d-4299-af1d-52d0995d295a" />
 
 
-Project Structure
+## Project Structure
 - emotion_detection_fer.ipynb: Training and testing FER model.
 - emotion_detection_DeepFace.ipynb: Using DeepFace for emotion recognition.
 - nao_demo_python.py: Main controller integrating webcam input, emotion recognition, and Q-Learning action selection.
 - Webots world files: Contain NAO robot setup for simulation.
 
-References
+## References
 - Goodfellow et al., Challenges in Representation Learning: A Report on Three Machine Learning Contests, ICML 2013 Workshop.
 - R.S. Sutton & A.G. Barto, Reinforcement Learning: An Introduction, 2nd Edition, MIT Press, 2018.
 - Aldebaran Robotics, NAO Humanoid Robot Documentation, SoftBank Robotics, 2014.
 - O. Michel, Webots: Professional Mobile Robot Simulation, International Journal of Advanced Robotic Systems, 2004.
 
-
-
-Acknowledgements
+## Acknowledgements
 - FER-2013 dataset for facial emotion recognition.
 - Webots and NAO robot simulation resources.
 
