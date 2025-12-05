@@ -26,9 +26,14 @@ This repository contains code and simulation environments for enabling a NAO hum
   git clone https://github.com/Thanwarin/robot-webots.git
 
 
+
+
+
+
 2. Install required Python packages:
   ```bash
   pip install -r requirements.txt
+
 
 3. Download pre-trained models and place them in the project directory (same folder as nao_demo_python.py):
 - Emotion Recognition Model: [Download here
