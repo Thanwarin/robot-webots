@@ -27,12 +27,12 @@ This repository contains code and simulation environments for enabling a NAO hum
 
 2. Install required Python packages:
   ```bash
-  pip install -r requirements.txt
+    pip install -r requirements.txt
 
 
 3. Launch Webots simulation and run the emotion recognition script:
   ```bash
-  python emotion_controller_webcam.py
+    python emotion_controller_webcam.py
 
 ## Project Structure
 
