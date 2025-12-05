@@ -1,4 +1,4 @@
-# robot-webots
+# Design and Implementation of an Integrated Control Framework for a NAO Humanoid Robot in Webots
 
 Facial Emotion Recognition for Human-Robot Interaction using FER/DeepFace and Webots simulation.
 
