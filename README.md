@@ -27,6 +27,7 @@ This repository contains code and simulation environments for enabling a NAO hum
 
 
 2. Install required Python packages:
+
   ```bash
   pip install -r requirements.txt
 
