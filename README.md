@@ -22,34 +22,45 @@ This repository contains code and simulation environments for enabling a NAO hum
 
 ## Getting Started
 1. Clone this repository:
-   ```bash
-   git clone https://github.com/Thanwarin/robot-webots.git
+```bash
+git clone https://github.com/Thanwarin/robot-webots.git
 
 2. Install required Python packages:
-   ```bash
-   pip install -r requirements.txt
-   
-```markdown
-3. Download pre-trained models:
-
+```bash
+pip install -r requirements.txt
+3. Download pre-trained models and place them in the project directory (same folder as nao_demo_python.py):
 - Emotion Recognition Model: [Download here
 ](https://drive.google.com/file/d/1b8FfnHOdwUhxmWSe27iqqs89xyuAc-bc/view?usp=sharing)
 - NAO Q-Table (Tuned): [Download here](https://drive.google.com/file/d/16vVjgt81T-OkOC9KZ-iL4VJEDAYYSj9R/view?usp=sharing)
 
-4. Launch Webots simulation and run the emotion recognition script:
-   ```bash
-   python nao_demo_python.py
+4.Launch Webots simulation and run the emotion recognition script:
+```bash
+python nao_demo_python.py
 
-## Project Structure
+Expected Behavior:
+- The NAO robot detects emotions from the webcam in real-time.
+- Performs corresponding gestures based on the Q-Learning action policy:
+- Happy → Happy Dance
+- Surprise → Big Surprise Gesture
+- Neutral, Angry, Sad → Corresponding gestures
+<img width="508" height="457" alt="happy_dance_example" src="https://github.com/user-attachments/assets/7f2b1ae7-007d-4299-af1d-52d0995d295a" />
 
+
+Project Structure
 - emotion_detection_fer.ipynb: Training and testing FER model.
 - emotion_detection_DeepFace.ipynb: Using DeepFace for emotion recognition.
 - nao_demo_python.py: Main controller integrating webcam input, emotion recognition, and Q-Learning action selection.
 - Webots world files: Contain NAO robot setup for simulation.
 
-## References
+References
+- Goodfellow et al., Challenges in Representation Learning: A Report on Three Machine Learning Contests, ICML 2013 Workshop.
+- R.S. Sutton & A.G. Barto, Reinforcement Learning: An Introduction, 2nd Edition, MIT Press, 2018.
+- Aldebaran Robotics, NAO Humanoid Robot Documentation, SoftBank Robotics, 2014.
+- O. Michel, Webots: Professional Mobile Robot Simulation, International Journal of Advanced Robotic Systems, 2004.
 
-- FER-2013 dataset: Goodfellow et al., 2013
-- Sutton, R.S. & Barto, A.G., Reinforcement Learning: An Introduction, MIT Press, 2018.
-- NAO robot documentation: Aldebaran Robotics, 2014.
-- Webots simulation: O. Michel, International Journal of Advanced Robotic Systems, 2004.
+
+
+Acknowledgements
+- FER-2013 dataset for facial emotion recognition.
+- Webots and NAO robot simulation resources.
+
