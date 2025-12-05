@@ -21,13 +21,12 @@ Based on my teammate Thanwarin Luangmanotham’s final vision model and the Q-Le
   
 - **After Updating and Reconstructing the Original Model Code:**
   
-  1.The original model code used a 5×5 Q-table, but there were six emotions. Also, the original code wrote that if the model could not detect an emotion, the robot would do the same action. The vision model could not detect the sixth emotion, so the NAO robot always received the same action signal. Based on this, I removed the sixth emotion (disgust) and improved the robot’s action after recognition:
-  
-happy → raise both hands and look up
-sad → lower the head and shake the head
-angry → stomp the feet like showing anger
-surprised → lift the head with a shocked face and stay still / or move arms and legs like being very surprised
-neutral / scared → swing the arms in place to imitate a human walking gesture.
+  - The original model code used a 5×5 Q-table, but there were six emotions. Also, the original code wrote that if the model could not detect an emotion, the robot would do the same action. The vision model could not detect the sixth emotion, so the NAO robot always received the same action signal. Based on this, I removed the sixth emotion (disgust) and improved the robot’s action after recognition:
+    happy → raise both hands and look up
+    sad → lower the head and shake the head
+    angry → stomp the feet like showing anger
+    surprised → lift the head with a shocked face and stay still / or move arms and legs like being very surprised
+    neutral / scared → swing the arms in place to imitate a human walking gesture.
   
   
 ## Features
