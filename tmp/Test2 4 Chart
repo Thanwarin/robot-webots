@@ -1,0 +1,196 @@
+
+# ==========================================
+sns.set_theme(style="whitegrid", font_scale=1.1)
+# Use standard sans-serif fonts for English
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = [
+    "Arial",
+    "DejaVu Sans",
+    "Liberation Sans",
+    "Bitstream Vera Sans",
+]
+
+
+def evaluate_english_report(log_file="mission_log_final.csv"):
+    # --- 1. Data Loading ---
+    try:
+        raw_df = pd.read_csv(log_file)
+        print(f">>> Data Loaded: {len(raw_df)} rows")
+
+        # Calculate Latency (ms)
+        raw_df["Latency_ms"] = raw_df["Time"].diff() * 1000
+
+        # Filter invalid latency for the chart
+        latency_df = raw_df[
+            (raw_df["Latency_ms"] > 0) & (raw_df["Latency_ms"] < 200)
+        ].copy()
+
+        # [Critical] Data Cleaning: Remove Neutral to focus on active emotions
+        df_clean = raw_df[raw_df["Emotion"] != "Neutral"].copy()
+        print(f">>> Cleaned Data (No Neutral): {len(df_clean)} rows")
+
+    except FileNotFoundError:
+        print("Error: CSV file not found. Please run the robot simulation first.")
+        return
+
+    # Define Expected Mapping (Ground Truth)
+    # Note: Adjust these if your robot does different actions
+    mapping = {
+        "Happy": "Raise Hands",
+        "Angry": "Stomp",
+        "Sad": "Shake Head",
+        "Surprise": "Big Dance",
+        "Fear": "Patrol",  # Based on your screenshot, Fear resulted in Patrol
+    }
+
+    # --- 2. Create Canvas (2x2) ---
+    fig, axes = plt.subplots(2, 2, figsize=(16, 12), dpi=100)
+    plt.subplots_adjust(hspace=0.4, wspace=0.3)
+    fig.suptitle(
+        "Robot Emotion Interaction System - Final Evaluation Report",
+        fontsize=20,
+        fontweight="bold",
+        y=0.96,
+    )
+
+    # =================================================================
+    # Chart 1: Action Accuracy (Filtered)
+    # =================================================================
+    ax1 = axes[0, 0]
+
+    acc_data = []
+    # Only analyze emotions present in the log and in our mapping
+    active_emos = [e for e in df_clean["Emotion"].unique() if e in mapping]
+
+    for emo in active_emos:
+        total = len(df_clean[df_clean["Emotion"] == emo])
+        target_act = mapping[emo]
+        # Check strict match
+        correct = len(
+            df_clean[
+                (df_clean["Emotion"] == emo) & (df_clean["Action"] == target_act)
+            ]
+        )
+        acc = (correct / total * 100) if total > 0 else 0
+        acc_data.append({"Emotion": emo, "Accuracy": acc})
+
+    acc_df = pd.DataFrame(acc_data)
+
+    colors = ["#FF9999", "#66B2FF", "#99FF99", "#FFCC99", "#D1C4E9"]
+    sns.barplot(x="Emotion", y="Accuracy", data=acc_df, palette=colors, ax=ax1, edgecolor=".2")
+
+    ax1.set_title(
+        "Fig 1: Core Action Response Accuracy (Noise Removed)",
+        fontweight="bold",
+        color="#333333",
+    )
+    ax1.set_ylabel("Accuracy (%)")
+    ax1.set_ylim(0, 115)
+
+    for p in ax1.patches:
+        ax1.annotate(
+            f"{p.get_height():.1f}%",
+            (p.get_x() + p.get_width() / 2.0, p.get_height()),
+            ha="center",
+            va="bottom",
+            fontsize=12,
+            fontweight="bold",
+        )
+
+    # =================================================================
+    # Chart 2: Confusion Matrix
+    # =================================================================
+    ax2 = axes[0, 1]
+
+    ct = pd.crosstab(df_clean["Emotion"], df_clean["Action"])
+    ct_norm = ct.div(ct.sum(1), axis=0)  # Normalize row-wise
+
+    sns.heatmap(
+        ct_norm,
+        annot=True,
+        fmt=".1%",
+        cmap="Blues",
+        ax=ax2,
+        cbar=True,
+        linewidths=1,
+    )
+
+    ax2.set_title(
+        "Fig 2: Emotion-Action Confusion Matrix",
+        fontweight="bold",
+        color="#333333",
+    )
+    ax2.set_ylabel("Detected Emotion (Input)")
+    ax2.set_xlabel("Robot Action (Output)")
+
+    # =================================================================
+    # Chart 3: Response Latency Distribution
+    # =================================================================
+    ax3 = axes[1, 0]
+
+    # Overlay Stripplot on Boxplot
+    sns.stripplot(
+        x="Emotion",
+        y="Latency_ms",
+        data=latency_df,
+        alpha=0.3,
+        color="gray",
+        ax=ax3,
+    )
+    sns.boxplot(
+        x="Emotion",
+        y="Latency_ms",
+        data=latency_df,
+        palette="Set2",
+        ax=ax3,
+        fliersize=0,
+    )
+
+    avg_lat = latency_df["Latency_ms"].mean()
+    ax3.set_title(
+        "Fig 3: Response Latency Distribution by Emotion",
+        fontweight="bold",
+        color="#333333",
+    )
+    ax3.set_ylabel("Response Latency (ms)")
+    ax3.axhline(
+        avg_lat,
+        color="r",
+        linestyle="--",
+        label=f"Avg: {avg_lat:.1f}ms",
+    )
+    ax3.legend()
+
+    # =================================================================
+    # Chart 4: Real-time Performance
+    # =================================================================
+    ax4 = axes[1, 1]
+
+    sample_data = latency_df.iloc[:200]
+    sns.lineplot(
+        data=sample_data["Latency_ms"].reset_index(drop=True),
+        color="purple",
+        ax=ax4,
+    )
+
+    ax4.set_title(
+        "Fig 4: Real-time System Latency (FPS Performance)",
+        fontweight="bold",
+        color="#333333",
+    )
+    ax4.set_ylabel("Processing Time (ms)")
+    ax4.set_xlabel("Frame Sequence")
+    ax4.fill_between(
+        range(len(sample_data)),
+        0,
+        sample_data["Latency_ms"].reset_index(drop=True),
+        alpha=0.1,
+        color="purple",
+    )
+
+    print(">>> Analysis Complete. Please save the generated figure.")
+    plt.show()
+
+
+if __name__ == "__main__":
+    evaluate_english_report()
