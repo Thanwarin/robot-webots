@@ -29,7 +29,13 @@ This repository contains code and simulation environments for enabling a NAO hum
    ```bash
    pip install -r requirements.txt
 
-3. Launch Webots simulation and run the emotion recognition script:
+3. Download pre-trained models:
+
+- Emotion Recognition Model: [Download here
+](https://drive.google.com/file/d/1b8FfnHOdwUhxmWSe27iqqs89xyuAc-bc/view?usp=sharing)
+- NAO Q-Table (Tuned): [Download here](https://drive.google.com/file/d/16vVjgt81T-OkOC9KZ-iL4VJEDAYYSj9R/view?usp=sharing)
+
+4. Launch Webots simulation and run the emotion recognition script:
    ```bash
    python nao_demo_python.py
 
