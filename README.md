@@ -21,11 +21,11 @@ This repository contains code and simulation environments for enabling a NAO hum
   - Processing speed: 15–20 FPS.
 
 ## Getting Started
-  1. Clone this repository:
+1. Clone this repository:
     ```bash
     git clone https://github.com/Thanwarin/robot-webots.git
 
-  2. Install required Python packages:
+2. Install required Python packages:
     ```bash
     pip install -r requirements.txt
 
