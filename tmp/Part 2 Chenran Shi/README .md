@@ -25,6 +25,7 @@ Based on my teammate Thanwarin Luangmanotham’s final vision model and the Q-Le
 
   
 ## Features
+
 - **Optimizing the NAO Robot’s Actions After Emotion Recognition:** 
   - happy → raise both hands and look up
   - sad → lower the head and shake the head
