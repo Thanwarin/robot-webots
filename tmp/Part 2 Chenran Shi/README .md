@@ -33,7 +33,7 @@ Based on my teammate Thanwarin Luangmanotham’s final vision model and the Q-Le
   - surprised → lift the head with a shocked face and stay still / or move arms and legs like being very surprised
   - neutral / scared → swing the arms in place to imitate a human walking gesture.
 - **Optimized Action Posture of the NAO Robot in the Full Process:** 
-
+  - By adjusting the NAO robot’s posture after it finishes the correct action for the recognized expression, the robot can return to a stable standing position. This makes it easier for the robot to stay balanced and perform the next action smoothly.
 
 
 
