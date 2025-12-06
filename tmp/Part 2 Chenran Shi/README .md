@@ -45,7 +45,10 @@ Based on my teammate Thanwarin Luangmanotham’s final vision model and the Q-Le
    
     [Download here](https://github.com/Thanwarin/robot-webots/blob/tmp/tmp/Part%202%20Chenran%20Shi/All%20required%20Python%20libraries.txt)
 
-
+3. Put my teammate Thanwarin Luangmanotham’s vision model and the Q-Learning training model into a new folder under the Webots NAO robot controllers directory.
+The folder name should be the same as nao_demo_python final version.py, and inside this folder you must include the file nao_demo_python final version.py.
+    - Emotion Recognition Model: [Download here](https://drive.google.com/file/d/1b8FfnHOdwUhxmWSe27iqqs89xyuAc-bc/view?usp=sharing)
+    - NAO Q-Table (Tuned): [Download here](https://drive.google.com/file/d/16vVjgt81T-OkOC9KZ-iL4VJEDAYYSj9R/view?usp=sharing)
 
 
 
