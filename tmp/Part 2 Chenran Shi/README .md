@@ -60,9 +60,9 @@ The folder name should be the same as nao_demo_python final version.py, and insi
 - sad → lower the head and shake the head
 ！[Sad](./images/Sad.jpg) 
 - angry → stomp the feet like showing anger
-！[Sad](./images/Angry.jpg)  
+！[Angry](./images/Angry.jpg)  
 - surprised → lift the head with a shocked face and stay still / or move arms and legs like being very surprised
-！[Sad](./images/Surprise.jpg) 
+！[Surprise](./images/Surprise.jpg) 
 - neutral / scared → swing the arms in place to imitate a human walking gesture.
 
 
