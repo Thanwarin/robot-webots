@@ -69,7 +69,7 @@ The folder name should be the same as nao_demo_python final version.py, and insi
 - Webots world files: Contain NAO robot setup for simulation.
 - nao_demo_python final version.py: Main controller integrating webcam input, emotion recognition, and Q-Learning action selection.
 - emotion_model_ver9.h5: Teammate Thanwarin’s vision recognition model helps the NAO robot recognize facial expressions.
-- nao_emotion_qtable_tuned.npy：Teammate Thanwarin’s Q-table file is used by the Q-Learning model. Based on this Q-table, the model maps the emotion recognized by the robot to the correct area in the table, allowing the NAO robot to judge by itself and choose the right action.
+- nao_emotion_qtable_tuned.npy：Q-table file is used by the Q-Learning model. Based on this Q-table, the model maps the emotion recognized by the robot to the correct area in the table, allowing the NAO robot to judge by itself and choose the right action.
 
 ## References
 - Aldebaran Robotics, NAO Humanoid Robot Documentation, SoftBank Robotics, 2014.
