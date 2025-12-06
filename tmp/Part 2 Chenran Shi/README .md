@@ -47,19 +47,23 @@ Based on my teammate Thanwarin Luangmanotham’s final vision model and the Q-Le
 
 3. Put my teammate Thanwarin Luangmanotham’s vision model and the Q-Learning training model into a new folder under the Webots NAO robot controllers directory.
 The folder name should be the same as nao_demo_python final version.py, and inside this folder you must include the file nao_demo_python final version.py.
+
     - Emotion Recognition Model: [Download here](https://drive.google.com/file/d/1b8FfnHOdwUhxmWSe27iqqs89xyuAc-bc/view?usp=sharing)
     - NAO Q-Table (Tuned): [Download here](https://drive.google.com/file/d/16vVjgt81T-OkOC9KZ-iL4VJEDAYYSj9R/view?usp=sharing)
+    
+4.Run Webots。
+    - After running Webots, open the NAO robot scene. In the left program tree in Webots, find the NAO robot and click to open it. Then find the controller field and change it from nao to nao_demo_python final version.py. After that, save the world and run it.
 
-
-
-
-
-
-
-
-
-
-
+## Expected Behavior of the NAO Robot:
+- happy → raise both hands and look up
+！[Happy](./images/Angry.jpg)
+- sad → lower the head and shake the head
+- 
+- angry → stomp the feet like showing anger
+- 
+- surprised → lift the head with a shocked face and stay still / or move arms and legs like being very surprised
+- 
+- neutral / scared → swing the arms in place to imitate a human walking gesture.
 
 
 
