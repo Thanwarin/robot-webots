@@ -32,7 +32,7 @@ Based on my teammate Thanwarin Luangmanotham’s final vision model and the Q-Le
   - angry → stomp the feet like showing anger
   - surprised → lift the head with a shocked face and stay still / or move arms and legs like being very surprised
   - neutral / scared → swing the arms in place to imitate a human walking gesture.
-
+- **Optimized Action Posture of the NAO Robot in the Full Process:** 
 
 
 
