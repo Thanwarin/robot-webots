@@ -35,9 +35,14 @@ Based on my teammate Thanwarin Luangmanotham’s final vision model and the Q-Le
 - **Optimized Action Posture of the NAO Robot in the Full Process:** 
   - By adjusting the NAO robot’s posture after it finishes the correct action for the recognized expression, the robot can return to a stable standing position. This makes it easier for the robot to stay balanced and perform the next action smoothly.
 
+## Start the Operation now.
 
+1. Find and clone the code in my repository（but do not clone any files whose names end with “not”).
+    ```bash
+    https://github.com/Thanwarin/robot-webots/tree/tmp/tmp/Part%202%20Chenran%20Shi
 
-
+2.Install the required Python libraries.
+    [Download here](https://github.com/Thanwarin/robot-webots/blob/tmp/tmp/Part%202%20Chenran%20Shi/All%20required%20Python%20libraries.txt)
 
 
 
