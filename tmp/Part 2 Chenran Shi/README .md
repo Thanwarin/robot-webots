@@ -22,9 +22,7 @@ Based on my teammate Thanwarin Luangmanotham’s final vision model and the Q-Le
 - **After Updating and Reconstructing the Original Model Code:**
   
   - The original model code used a 5×5 Q-table, but there were six emotions. Also, the original code wrote that if the model could not detect an emotion, the robot would do the same action. The vision model could not detect the sixth emotion, so the NAO robot always received the same action signal. Based on this, I removed the sixth emotion (disgust) and improved the robot’s action after recognition.
-  - To solve the problem of the NAO robot reacting too fast and losing balance, I added a rule in my Webots controller code. After the robot detects a facial expression, it must finish the full action process first. After the action is done, it will detect the next facial expression and then start the next full action process. This helps reduce the error where the robot starts a new action before the previous one stops because the recognition is too fast.
-
-I also adjusted the robot’s center of gravity when doing the happy action (raising both arms) and when the arms return to the reset position. This makes the robot more stable and helps prevent it from losing balance while doing the actions.
+  - To solve the problem of the NAO robot reacting too fast and losing balance, I added a rule in my Webots controller code. After the robot detects a facial expression, it must finish the full action process first. After the action is done, it will detect the next facial expression and then start the next full action process. This helps reduce the error where the robot starts a new action before the previous one stops because the recognition is too fast.I also adjusted the robot’s center of gravity when doing the happy action (raising both arms) and when the arms return to the reset position. This makes the robot more stable and helps prevent it from losing balance while doing the actions.
   
 ## Features
 
