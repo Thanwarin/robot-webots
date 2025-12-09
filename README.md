@@ -47,7 +47,7 @@ to create an interactive and responsive HRI pipeline.
 
   Place the following files in the same directory as nao_demo_python.py:
   - Emotion Recognition Model: [Download here](https://drive.google.com/file/d/1b8FfnHOdwUhxmWSe27iqqs89xyuAc-bc/view?usp=sharing)
-    - NAO Q-Table (Tuned): [Download here](https://drive.google.com/file/d/16vVjgt81T-OkOC9KZ-iL4VJEDAYYSj9R/view?usp=sharing)
+  - NAO Q-Table (Tuned): [Download here](https://drive.google.com/file/d/16vVjgt81T-OkOC9KZ-iL4VJEDAYYSj9R/view?usp=sharing)
 
 
 4. Launch Webots and run the controller
