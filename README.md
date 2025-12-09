@@ -13,26 +13,26 @@ to create an interactive and responsive HRI pipeline.
 
 ## Features
 - **Facial Emotion Recognition**
-- Supports FER-2013 model and DeepFace emotion classifier
-- Detects Neutral, Happy, Angry, Sad, Surprise
-- Real-time webcam input supported (15–20 FPS)
+  - Supports FER-2013 model and DeepFace emotion classifier
+  - Detects Neutral, Happy, Angry, Sad, Surprise
+  - Real-time webcam input supported (15–20 FPS)
 
 - **Emotion–Action Mapping**
-- Tabular Q-Learning maps detected emotions → robot gestures
-- Includes expressive animations such as:
-  - Happy Dance
-  - Surprise Gesture
-  - Neutral, Sad, Angry responses
+  - Tabular Q-Learning maps detected emotions → robot gestures
+  - Includes expressive animations such as:
+    - Happy Dance
+    - Surprise Gesture
+    - Neutral, Sad, Angry responses
 
 - **Webots Simulation**
-- Fully interactive NAO robot environment
-- Robot performs gestures based on live human emotion input
-- Supports real-time HRI experiments
+  - Fully interactive NAO robot environment
+  - Robot performs gestures based on live human emotion input
+  - Supports real-time HRI experiments
 
 - **Performance Metrics**
-- ~64% emotion recognition accuracy (FER-2013 validation)
-- ~90% correct response rate between detected emotion and Q-Learning action
-- 15–20 FPS live processing
+  - ~64% emotion recognition accuracy (FER-2013 validation)
+  - ~90% correct response rate between detected emotion and Q-Learning action
+  - 15–20 FPS live processing
 
 ## Getting Started
 1. Clone this repository
@@ -45,9 +45,9 @@ to create an interactive and responsive HRI pipeline.
 
 3. Download pre-trained models
 
-Place the following files in the same directory as nao_demo_python.py:
-- Emotion Recognition Model: [Download here](https://drive.google.com/file/d/1b8FfnHOdwUhxmWSe27iqqs89xyuAc-bc/view?usp=sharing)
-  - NAO Q-Table (Tuned): [Download here](https://drive.google.com/file/d/16vVjgt81T-OkOC9KZ-iL4VJEDAYYSj9R/view?usp=sharing)
+  Place the following files in the same directory as nao_demo_python.py:
+  - Emotion Recognition Model: [Download here](https://drive.google.com/file/d/1b8FfnHOdwUhxmWSe27iqqs89xyuAc-bc/view?usp=sharing)
+    - NAO Q-Table (Tuned): [Download here](https://drive.google.com/file/d/16vVjgt81T-OkOC9KZ-iL4VJEDAYYSj9R/view?usp=sharing)
 
 
 4. Launch Webots and run the controller
@@ -68,8 +68,9 @@ Happy	Happy Dance
 Surprise	Surprise Gesture
 Neutral / Angry / Sad	Corresponding expressive actions
 <p align="center"> <img width="450" alt="happy_dance_example" src="https://github.com/user-attachments/assets/7f2b1ae7-007d-4299-af1d-52d0995d295a" /> </p>
+
 ## Project Structure
-.
+
 ├── emotion_detection_fer.ipynb          # FER model training/testing  
 
 ├── emotion_detection_DeepFace.ipynb     # DeepFace emotion detection demo  
