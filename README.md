@@ -71,9 +71,13 @@ Neutral / Angry / Sad	Corresponding expressive actions
 ## Project Structure
 .
 ├── emotion_detection_fer.ipynb          # FER model training/testing  
+
 ├── emotion_detection_DeepFace.ipynb     # DeepFace emotion detection demo  
-├── nao_demo_python.py                   # Main controller (Webcam + FER + Q-Learning + NAO actions)  
+
+├── nao_demo_python.py                   # Main controller (Webcam + FER + Q-Learning + NAO actions) 
+
 ├── worlds/                              # Webots NAO simulation world  
+
 └── controllers/                         # Webots controller files  
 
 ## References
