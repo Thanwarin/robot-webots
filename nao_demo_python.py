@@ -1,304 +1,310 @@
 """
-NAO Emotion Controller with Learned Policy + Happy & Big Dance
-- Python 3 + Webots API
-- Uses Mediapipe Face Detection + Keras Emotion Model + Q-Learning Policy
-- Smooth motor interpolation to prevent falling
+Module: LH/LM Intelligent Robotics (30227,30244)
+
+Description: 
+Final Controller for Coursework 2.
+Integrated Face Detection, Q-Learning Decision, and Motor Control.
+Note: Fixed the balance issue when resetting from Happy pose.
 """
 
 import os
 import cv2
 import numpy as np
-import logging
+import csv
+import time
+import math
+# Stop tensorflow logs, very annoying in console
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 from controller import Robot
 from tensorflow.keras.models import load_model
 import mediapipe as mp
 
+# ==============================================================================
+# [PART 1] CONFIGURATION
+# All parameters are here. Easy to tune.
+# ==============================================================================
+class Config:
+    # --- System ---
+    TIME_STEP = 32
+    WEBCAM_ID = 0  # Use 0 for default laptop camera
+    
+    # --- Files (Check paths!) ---
+    MODEL_PATH = "emotion_model_ver9.h5"
+    Q_TABLE_PATH = "nao_emotion_qtable_tuned.npy"
+    LOG_FILE = "mission_log_final.csv"
+    
+    # --- Thresholds ---
+    CONF_THRESH = 0.6
+    
+    # --- Balance Parameters ---
+    # [Fix]: Added this offset to prevent falling backwards when resetting.
+    # A negative value means leaning forward slightly.
+    LEAN_FORWARD_OFFSET = -0.1 
+    
+    # --- Logic ---
+    # 0:Patrol, 1:Happy, 2:Angry, 3:Sad, 4:Surprise
+    ACTIONS = ['Patrol', 'Raise Hands', 'Stomp', 'Shake Head', 'Big Dance']
 
-# ------------------------------
-# CONFIG
-# ------------------------------
-TIME_STEP = 40  # ms per simulation step
-Q_TABLE_PATH = "nao_emotion_qtable_tuned.npy"
-EMOTION_MODEL_PATH = "emotion_model_ver9.h5"
 
-IMG_WIDTH, IMG_HEIGHT = 96, 96
-EMOTION_LABELS_7 = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
-CONFIDENCE_THRESHOLD = 0.6
+# ==============================================================================
+# [PART 2] NAO DRIVER (Hardware Interface)
+# Handles motors and sensors only. No complex logic.
+# ==============================================================================
+class NaoDriver:
+    def __init__(self):
+        print("Driver: Initialising motors...")
+        self.robot = Robot()
+        self.motors = {}
+        
+        # Define joints we need to control
+        # It's a long list...
+        names = [
+            "HeadYaw", "HeadPitch",
+            "LShoulderPitch", "LShoulderRoll", "RShoulderPitch", "RShoulderRoll",
+            "LHipPitch", "RHipPitch", "LKneePitch", "RKneePitch",
+            "LAnklePitch", "RAnklePitch", "LHipRoll", "RHipRoll"
+        ]
+        
+        for n in names:
+            self.motors[n] = self.robot.getDevice(n)
+            
+        # Init Webcam
+        # We use external webcam because Webots camera simulation is slow on my laptop
+        self.cap = cv2.VideoCapture(Config.WEBCAM_ID)
+        # Set low resolution for speed
+        self.cap.set(3, 320)
+        self.cap.set(4, 240)
+        
+        if not self.cap.isOpened():
+            print("Error: Webcam not open!")
 
-# Q-Learning states & actions
-Q_STATE_NAMES = ['Neutral', 'Happy', 'Angry', 'Sad', 'Surprise']
-Q_ACTION_NAMES = ['Patrol (Walk)', 'Wave', 'Stomp', 'Slouch', 'Big Dance', 'Happy Dance']  # Added Happy Dance
+    def set_joints(self, target_dict):
+        # Set motor positions directly
+        for name, val in target_dict.items():
+            if name in self.motors:
+                self.motors[name].setPosition(val)
 
-FRAME_SKIP = 3
-WEBCAM_W, WEBCAM_H = 320, 240
+    def get_frame(self):
+        ret, frame = self.cap.read()
+        if not ret: return None
+        return frame
+        
+    def close(self):
+        self.cap.release()
+        cv2.destroyAllWindows()
 
-logging.basicConfig(filename="nao_emotion_log.txt", level=logging.INFO,
-                    format="%(asctime)s - %(levelname)s - %(message)s")
 
-# ------------------------------
-# INITIALIZE ROBOT + MOTORS
-# ------------------------------
-robot = Robot()
+# ==============================================================================
+# [PART 3] NAO BRAIN (AI & Decision)
+# Handles Emotion Recognition and Q-Learning.
+# ==============================================================================
+class NaoBrain:
+    def __init__(self):
+        print("Brain: Loading models...")
+        
+        # 1. Load Emotion Model (Keras)
+        try:
+            self.model = load_model(Config.MODEL_PATH)
+            print(">>> Keras Model Loaded.")
+        except: 
+            print("Error: Keras model failed to load.")
+            
+        # 2. Load RL Policy (Q-Table)
+        if os.path.exists(Config.Q_TABLE_PATH):
+            self.q_table = np.load(Config.Q_TABLE_PATH)
+            # Safe check for shape
+            if self.q_table.shape != (5,5):
+                print("Warning: Q-Table shape is wrong! Using zeros.")
+                self.q_table = np.zeros((5,5))
+            else:
+                print(">>> Q-Table Loaded.")
+        else:
+            self.q_table = np.zeros((5,5))
+            
+        # 3. Face Detection
+        self.mp_face = mp.solutions.face_detection.FaceDetection(0.5)
+        
+        # 4. Logger (For report data)
+        self.f_log = open(Config.LOG_FILE, 'w', newline='')
+        self.writer = csv.writer(self.f_log)
+        self.writer.writerow(["Time", "Emotion", "Action", "Confidence"])
 
-# Motors (Webots NAO model)
-motor_names = [
-    "HeadYaw","HeadPitch",
-    "LShoulderPitch","LShoulderRoll","RShoulderPitch","RShoulderRoll",
-    "LHipPitch","RHipPitch","LKneePitch","RKneePitch",
-    "LHipRoll","RHipRoll","LAnklePitch","RAnklePitch","LAnkleRoll","RAnkleRoll"
-]
-motors = {name: robot.getDevice(name) for name in motor_names}
-
-# ------------------------------
-# LOAD Q-TABLE
-# ------------------------------
-if os.path.exists(Q_TABLE_PATH):
-    Q_TABLE = np.load(Q_TABLE_PATH)
-    if Q_TABLE.shape != (len(Q_STATE_NAMES), len(Q_ACTION_NAMES)):
-        logging.warning("Q-Table shape mismatch. Using zeros.")
-        Q_TABLE = np.zeros((len(Q_STATE_NAMES), len(Q_ACTION_NAMES)))
-else:
-    logging.warning("Q-Table not found. Using zeros.")
-    Q_TABLE = np.zeros((len(Q_STATE_NAMES), len(Q_ACTION_NAMES)))
-
-# ------------------------------
-# LOAD EMOTION MODEL
-# ------------------------------
-try:
-    emotion_model = load_model(EMOTION_MODEL_PATH)
-    logging.info("Loaded Keras model.")
-except Exception as e:
-    logging.exception("Failed to load Keras model: %s", e)
-    raise SystemExit("Cannot load Keras model.")
-
-# ------------------------------
-# PATROL WALK SETUP
-# ------------------------------
-PATROL_SEQUENCE = [
-    {"LHipPitch": 0.08, "RHipPitch": -0.08, "LKneePitch": 0.0, "RKneePitch": 0.0,
-     "LAnklePitch": -0.04, "RAnklePitch": 0.04, "LHipRoll": 0.03, "RHipRoll": -0.03},
-    {"LHipPitch": -0.08, "RHipPitch": 0.08, "LKneePitch": 0.0, "RKneePitch": 0.0,
-     "LAnklePitch": 0.04, "RAnklePitch": -0.04, "LHipRoll": -0.03, "RHipRoll": 0.03}
-]
-patrol_step_index = 0
-patrol_target_time = 0.0
-PATROL_STEP_DURATION = 0.3  # slightly faster
-
-def set_motor_targets(targets):
-    """Set motors to target positions directly"""
-    for name, val in targets.items():
-        if name in motors:
-            motors[name].setPosition(val)
-
-def do_patrol_step():
-    """Perform a patrol walk step with smooth interpolation"""
-    global patrol_step_index, patrol_target_time
-    if robot.getTime() >= patrol_target_time:
-        current_targets = PATROL_SEQUENCE[patrol_step_index]
-        for step in range(5):
-            for name, val in current_targets.items():
-                if name in motors:
-                    motors[name].setPosition(val * (step + 1) / 5.0)
-            robot.step(TIME_STEP)
-        patrol_step_index = (patrol_step_index + 1) % len(PATROL_SEQUENCE)
-        patrol_target_time = robot.getTime() + PATROL_STEP_DURATION
-
-# ------------------------------
-# UTILITIES
-# ------------------------------
-def map_keras_to_q_state(label):
-    """Map Keras emotion label to Q-learning state index"""
-    if label in ['Neutral', 'Disgust', 'Fear']:
-        return 0
-    elif label == 'Happy':
-        return 1
-    elif label == 'Angry':
-        return 2
-    elif label == 'Sad':
-        return 3
-    elif label == 'Surprise':
-        return 4
-    return 0
-
-def decide_optimal_action(q_state):
-    """Select optimal action based on Q-table"""
-    q_values = Q_TABLE[q_state, :]
-    action_idx = int(np.argmax(q_values))
-    logging.info("Decision: Q-State=%s -> Action=%s", Q_STATE_NAMES[q_state], Q_ACTION_NAMES[action_idx])
-    return action_idx
-
-def smooth_motor_move(targets, steps=5):
-    """Smoothly move motors to targets in 'steps' interpolation"""
-    for i in range(1, steps + 1):
-        alpha = i / float(steps)
-        for name, val in targets.items():
-            if name in motors:
-                motors[name].setPosition(val * alpha)
-        robot.step(TIME_STEP)
-
-def reset_pose(steps=5):
-    """Reset all motors to neutral pose"""
-    targets = {name: 0.0 for name in motors.keys()}
-    smooth_motor_move(targets, steps=steps)
-
-def execute_nao_action(action_index):
-    """Execute NAO action based on index"""
-    reset_pose(steps=4)
-
-    if action_index == 1:  # Wave
-        targets = {"RShoulderPitch": 0.9, "RShoulderRoll": 0.4}
-        smooth_motor_move(targets, steps=4)
-
-    elif action_index == 2:  # Stomp (Angry)
-        targets = {"HeadYaw": 0.25, "LHipPitch": 0.09, "RHipPitch": 0.09}
-        smooth_motor_move(targets, steps=4)
-        targets = {"LHipPitch": -0.09, "RHipPitch": -0.09}
-        smooth_motor_move(targets, steps=4)
-
-    elif action_index == 3:  # Slouch (Sad)
-        targets = {"HeadPitch": 0.28}
-        smooth_motor_move(targets, steps=4)
-
-    elif action_index == 4:  # Big Dance (Surprise)
-        # Big Dance: alternate arms, hips, head for 6 steps
-        dance_targets = {}
-        for i in range(6):
-            dance_targets["LShoulderPitch"] = 0.4 * (-1)**i
-            dance_targets["RShoulderPitch"] = 0.4 * (-1)**i
-            dance_targets["LHipPitch"] = 0.15 * (-1)**i
-            dance_targets["RHipPitch"] = 0.15 * (-1)**i
-            dance_targets["HeadYaw"] = 0.25 * (-1)**i
-            dance_targets["HeadPitch"] = -0.1 * (-1)**i
-            smooth_motor_move(dance_targets, steps=5)
-
-    elif action_index == 5:  # Happy Dance (Happy)
-        # Full Happy Dance: swing arms, tilt body
-        dance_targets = {}
-        for i in range(8):
-            dance_targets["LShoulderPitch"] = 0.5 * (-1)**i
-            dance_targets["RShoulderPitch"] = 0.5 * (-1)**i
-            dance_targets["LHipPitch"] = 0.2 * (-1)**i
-            dance_targets["RHipPitch"] = 0.2 * (-1)**i
-            dance_targets["HeadYaw"] = 0.3 * (-1)**i
-            dance_targets["HeadPitch"] = -0.15 * (-1)**i
-            smooth_motor_move(dance_targets, steps=5)
-
-    elif action_index == 0:  # Patrol handled by do_patrol_step
-        pass
-
-    if action_index != 0:
-        reset_pose(steps=4)
-
-# ------------------------------
-# EMOTION PREDICTION
-# ------------------------------
-def predict_emotion(face_img):
-    """Predict emotion from face image using Keras model"""
-    try:
-        if face_img is None or face_img.size == 0:
-            return "Neutral"
-        img = cv2.resize(face_img, (IMG_WIDTH, IMG_HEIGHT))
-        img = img.astype("float32") / 255.0
-        img = np.expand_dims(img, axis=0)
-        preds = emotion_model.predict(img, verbose=0)
-        label_idx = int(np.argmax(preds))
-        confidence = float(np.max(preds))
-        label = EMOTION_LABELS_7[label_idx]
-        if confidence < CONFIDENCE_THRESHOLD:
-            return "Neutral"
-        return label
-    except Exception as e:
-        logging.exception("predict_emotion error: %s", e)
-        return "Neutral"
-
-# ------------------------------
-# MEDIAPIPE + WEBCAM
-# ------------------------------
-mp_face = mp.solutions.face_detection
-face_detector = mp_face.FaceDetection(model_selection=0, min_detection_confidence=0.5)
-cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, WEBCAM_W)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, WEBCAM_H)
-if not cap.isOpened():
-    raise RuntimeError("Cannot open webcam")
-
-# ------------------------------
-# MAIN LOOP
-# ------------------------------
-frame_count = 0
-last_label = "Neutral"
-current_action_index = 0  # default Patrol
-
-try:
-    while robot.step(TIME_STEP) != -1:
-        ret, frame = cap.read()
-        if not ret:
-            continue
-        frame_count += 1
+    def process_image(self, frame):
+        # Mediapipe process
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = face_detector.process(rgb)
+        results = self.mp_face.process(rgb)
+        
+        if not results.detections: return None
+        
+        # Only take the first face
+        det = results.detections[0]
+        bbox = det.location_data.relative_bounding_box
+        h, w, _ = frame.shape
+        x, y = int(bbox.xmin*w), int(bbox.ymin*h)
+        bw, bh = int(bbox.width*w), int(bbox.height*h)
+        
+        # Check boundary
+        if x<0 or y<0 or bw<1 or bh<1: return None
+        
+        # Draw for UI
+        cv2.rectangle(frame, (x,y), (x+bw, y+bh), (0,255,0), 2)
+        
+        # Return cropped face
+        return frame[y:y+bh, x:x+bw]
 
-        face_detected = False
-        largest_area = 0
-        best_crop = None
-        best_coords = None
+    def predict(self, face_img):
+        # Resize to 96x96 for model
+        rz = cv2.resize(face_img, (96, 96))
+        norm = rz.astype("float32") / 255.0
+        batch = np.expand_dims(norm, axis=0)
+        
+        # Predict
+        preds = self.model.predict(batch, verbose=0)
+        idx = int(np.argmax(preds))
+        conf = float(np.max(preds))
+        
+        # Map 7 classes to 5 RL states
+        labels_7 = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']
+        raw_emo = labels_7[idx]
+        
+        # Mapping logic:
+        # 0:Neutral, 1:Happy, 2:Angry, 3:Sad, 4:Surprise
+        st_idx = 0
+        if raw_emo == 'Happy': st_idx = 1
+        elif raw_emo == 'Angry': st_idx = 2
+        elif raw_emo == 'Sad': st_idx = 3
+        elif raw_emo == 'Surprise': st_idx = 4
+        # Disgust/Fear -> Neutral
+        
+        return raw_emo, st_idx, conf
 
-        if results.detections:
-            for det in results.detections:
-                box = det.location_data.relative_bounding_box
-                h, w, _ = frame.shape
-                x1 = max(0, int(box.xmin * w))
-                y1 = max(0, int(box.ymin * h))
-                x2 = min(w, int((box.xmin + box.width) * w))
-                y2 = min(h, int((box.ymin + box.height) * h))
-                if (x2 - x1) * (y2 - y1) > largest_area:
-                    largest_area = (x2 - x1) * (y2 - y1)
-                    best_crop = frame[y1:y2, x1:x2]
-                    best_coords = (x1, y1, x2, y2)
+    def get_action_from_q(self, st_idx):
+        # Choose action with highest Q value
+        return int(np.argmax(self.q_table[st_idx]))
 
-            if best_crop is not None:
-                face_detected = True
-                if frame_count % FRAME_SKIP == 0:
-                    label = predict_emotion(best_crop)
-                    last_label = label
-                    q_state = map_keras_to_q_state(label)
-                    new_action = decide_optimal_action(q_state)
 
-                    # Map Q-action index to NAO action
-                    if label == "Happy":
-                        new_action = 5  # Happy Dance
-                    elif label == "Surprise":
-                        new_action = 4  # Big Dance
+# ==============================================================================
+# [PART 4] MAIN CONTROLLER
+# Connects Driver and Brain. Contains the Control Loop.
+# ==============================================================================
+def main():
+    driver = NaoDriver()
+    brain = NaoBrain()
+    
+    # Variables for state control
+    current_act = 0
+    t_start_act = 0
+    is_acting = False
+    
+    print(">>> System Started. Press 'q' to exit.")
+    
+    while driver.robot.step(Config.TIME_STEP) != -1:
+        # 1. Get visual input
+        frame = driver.get_frame()
+        if frame is None: continue
+        
+        face_img = brain.process_image(frame)
+        
+        # Default action is Patrol (0)
+        act_idx = 0 
+        
+        # 2. Brain Logic (Only if not currently performing an action)
+        if face_img is not None and not is_acting:
+            try:
+                emo, st_idx, conf = brain.predict(face_img)
+                
+                if conf > Config.CONF_THRESH:
+                    act_idx = brain.get_action_from_q(st_idx)
+                    
+                    # Log data
+                    brain.writer.writerow([time.time(), emo, Config.ACTIONS[act_idx], conf])
+                    
+                    # Display Text
+                    cv2.putText(frame, f"{emo}->{Config.ACTIONS[act_idx]}", (10,30), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
+                               
+                    # If action is not Patrol, lock the state
+                    if act_idx != 0:
+                        is_acting = True
+                        t_start_act = driver.robot.getTime()
+                        current_act = act_idx
+                        print(f"Action Triggered: {Config.ACTIONS[act_idx]}")
+            except: 
+                pass
 
-                    if new_action != 0 and new_action != current_action_index:
-                        execute_nao_action(new_action)
-                        current_action_index = new_action
-                    elif new_action == 0 and current_action_index != 0:
-                        reset_pose(steps=4)
-                        current_action_index = 0
+        # 3. Motion Controller (The Physics Part)
+        
+        # Define Neutral/Safe Pose first
+        # [Important]: We add LEAN_FORWARD_OFFSET here to fix the falling back issue!
+        safe_pose = {
+            "LShoulderPitch": 1.6, "RShoulderPitch": 1.6,
+            "HeadPitch": 0.0,
+            # Crouch legs slightly
+            "LKneePitch": 0.7, "RKneePitch": 0.7,
+            # Move CoM forward
+            "LHipPitch": -0.4 + Config.LEAN_FORWARD_OFFSET, 
+            "RHipPitch": -0.4 + Config.LEAN_FORWARD_OFFSET,
+            "LAnklePitch": -0.3, "RAnklePitch": -0.3
+        }
 
-                if best_coords:
-                    x1, y1, x2, y2 = best_coords
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0,200,0), 2)
-                    cv2.putText(frame, last_label, (x1, y1-10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,200,0), 2)
+        if is_acting:
+            # Check timeout (Action duration 3s)
+            if driver.robot.getTime() - t_start_act > 3.0:
+                is_acting = False
+                current_act = 0
+                print("Action finished. Resetting...")
+            
+            # Execute specific action logic
+            if current_act == 1: # Happy -> Hands Up
+                # Need to lean forward more to balance raised hands
+                driver.set_joints({
+                    "LShoulderPitch": -1.5, "RShoulderPitch": -1.5,
+                    "LShoulderRoll": 0.2, "RShoulderRoll": -0.2,
+                    "HeadPitch": -0.3,
+                    # Extra counter-balance
+                    "LHipPitch": -0.6, "RHipPitch": -0.6
+                })
+                
+            elif current_act == 2: # Angry -> Stomp
+                driver.set_joints({
+                    "HeadYaw": 0.3, "LHipPitch": -0.3, "RHipPitch": -0.3
+                })
+                
+            elif current_act == 3: # Sad -> Shake Head
+                t = driver.robot.getTime()
+                shake = 0.5 * math.sin(t * 5.0)
+                driver.set_joints({
+                    "HeadPitch": 0.4, # Look down
+                    "HeadYaw": shake,
+                    "LShoulderPitch": 1.8, "RShoulderPitch": 1.8
+                })
+                
+            elif current_act == 4: # Dance
+                t = driver.robot.getTime()
+                # Offset sine wave so arms don't hit body
+                driver.set_joints({
+                    "LShoulderRoll": 0.6 + 0.5 * math.sin(t*4),
+                    "RShoulderRoll": -0.6 - 0.5 * math.sin(t*4)
+                })
+        else:
+            # Idle Mode: Patrol (Arm swing) + Safe Pose
+            t = driver.robot.getTime()
+            swing = 0.3 * math.sin(t * 2.0)
+            
+            # Apply base pose first
+            driver.set_joints(safe_pose)
+            # Add arm swing on top
+            driver.set_joints({
+                "LShoulderPitch": 1.6 + swing, 
+                "RShoulderPitch": 1.6 - swing
+            })
 
-        # No face detected
-        if not face_detected:
-            if current_action_index != 0:
-                reset_pose(steps=4)
-                current_action_index = 0
-            do_patrol_step()
-            cv2.putText(frame, "NO FACE DETECTED (Patrol Mode)", (10,30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,0,255), 2)
+        # Show UI
+        cv2.imshow("Webcam", frame)
+        if cv2.waitKey(1) == ord('q'): break
+        
+    driver.close()
 
-        cv2.imshow("NAO Webcam", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-except KeyboardInterrupt:
-    print("Interrupted by user")
-finally:
-    cap.release()
-    cv2.destroyAllWindows()
-    logging.info("Shutting down NAO controller.")
+if __name__ == "__main__":
+    main()
