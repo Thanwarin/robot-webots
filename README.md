@@ -98,7 +98,7 @@ Then run Webots or execute:
 python nao_demo_python.py
 ```
 
-### Example Gesture Image
+### Example Emotion Image
 <p align="center">
   <img width="450" src="https://github.com/user-attachments/assets/7f2b1ae7-007d-4299-af1d-52d0995d295a" alt="happy action"/>
 </p>
