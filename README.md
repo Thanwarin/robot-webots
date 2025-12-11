@@ -147,6 +147,25 @@ When the system is running, the NAO robot detects the user's facial emotion thro
 - Robot completes each action before detecting a new emotion  
 - Improved posture transitions and gesture fluidity  
 
+
+ 
+## Contributors
+
+- **Thanwarin Luangmanotham**: Develop contrastive loss function, pre-training/fine-tuning pipeline, and human pose–object fusion module for social representation learning; implement parts of robot policy integration to test learned representations.
+- **Shuqin Wang**: Build multi-dataset processing pipeline with augmentation and quality evaluation for social behavior data; implement data feeding modules for robot experiments.
+- **Chenran Shi**: Implement Policy Network, social rule mapping, and robot action safety verification for decision-control; program robot to execute learned social behaviors in simulated scenarios.
+- **Yintao Ma**: Develop an evaluation system with quantitative and qualitative metrics, experiment automation, and ethical protocols; implement test scripts that directly interact with robot policies to generate evaluation data.
+
+
+---
+
+## Acknowledgements
+
+- FER-2013 Dataset  
+- DeepFace Library  
+- Webots Simulation Tools  
+- NAO Humanoid Robot
+
 ---
 
 ## References
@@ -165,15 +184,5 @@ When the system is running, the NAO robot detects the user's facial emotion thro
 - Shao, W., Zhang, L., & He, J., *Reinforcement learning for adaptive human-robot interaction*, Robotics and Autonomous Systems, vol. 124, pp. 103395, 2020.
 - Sutton, R. S. & Barto, A. G., *Reinforcement Learning: An Introduction*, 2nd Edition, MIT Press, 2018.
 - Tapus, A., Mataric, M. J., & Scassellati, B., *Socially assistive robotics [Grand challenges of robotics]*, IEEE Robotics & Automation Magazine, vol. 14, no. 1, pp. 35–42, 2007.
- 
-
----
-
-## Acknowledgements
-
-- FER-2013 Dataset  
-- DeepFace Library  
-- Webots Simulation Tools  
-- NAO Humanoid Robot  
 
 
