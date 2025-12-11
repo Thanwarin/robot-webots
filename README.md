@@ -1,93 +1,179 @@
-# Design and Implementation of an Integrated Control Framework for a NAO Humanoid Robot in Webots
-Facial Emotion Recognition for Human-Robot Interaction using FER/DeepFace and Webots Simulation.
+# Design and Implementation of an Integrated Recognition and Control Framework for the NAO Humanoid Robot in Webots
+
+Facial Emotion Recognition and Q-Learning–based Action Selection for Human–Robot Interaction using Webots Simulation.
+
+
 
 ## Overview
 
-This repository contains code and simulation tools for enabling a NAO humanoid robot to recognize human facial emotions and respond with expressive, robot-like gestures inside the Webots simulator.
+This project integrates **Facial Emotion Recognition (FER/DeepFace)** with a **Q-Learning action-selection model** to enable a NAO humanoid robot inside Webots to:
 
-The system integrates:
-- Facial Emotion Recognition (FER / DeepFace)
-- Q-Learning–based action selection
-- NAO expressive gesture execution
-to create an interactive and responsive HRI pipeline.
+- Recognize human facial emotions using a webcam  
+- Interpret emotion → action using a Q-table  
+- Perform expressive animations with improved stability  
+- Execute actions only after completing the previous one (balance-safe behavior)  
+
+The final system achieves smooth, autonomous human–robot interaction (HRI) inside Webots.
+
 
 ## Features
-- **Facial Emotion Recognition**
-  - Supports FER-2013 model and DeepFace emotion classifier
-  - Detects Neutral, Happy, Angry, Sad, Surprise
-  - Real-time webcam input supported (15–20 FPS)
 
-- **Emotion–Action Mapping**
-  - Tabular Q-Learning maps detected emotions → robot gestures
-  - Includes expressive animations such as:
-    - Happy Dance
-    - Surprise Gesture
-    - Neutral, Sad, Angry responses
+### Facial Emotion Recognition
+- Supports FER-2013 and DeepFace models  
+- Detects:
+  - Happy  
+  - Sad  
+  - Angry  
+  - Surprise  
+  - Neutral  
+- Real-time webcam processing at **15–20 FPS**
 
-- **Webots Simulation**
-  - Fully interactive NAO robot environment
-  - Robot performs gestures based on live human emotion input
-  - Supports real-time HRI experiments
 
-- **Performance Metrics**
-  - ~64% emotion recognition accuracy (FER-2013 validation)
-  - ~90% correct response rate between detected emotion and Q-Learning action
-  - 15–20 FPS live processing
+
+### Emotion–Action Mapping (Q-Learning)
+
+The Q-Learning model maps each recognized emotion to a specific robot gesture.
+
+| Emotion             | Gesture                                                         |
+|--------------------|------------------------------------------------------------------|
+| **Happy**          | Raise both hands and look up                                     |
+| **Sad**            | Lower head and shake head                                        |
+| **Angry**          | Stomp feet forcefully                                            |
+| **Surprise**       | Lift head with shocked posture / arms up                         |
+| **Neutral/Scared** | Swing arms in place like a walking gesture                       |
+
+Improvements:
+- Removed unused **disgust** category  
+- Ensured NAO **finishes each gesture** before detecting the next emotion  
+- Adjusted center of gravity for improved stability  
+
+
+
+### Stability Optimization
+
+To prevent NAO from losing balance:
+- Added action-complete timing control  
+- Optimized transitions between gestures  
+- Smoothed reset-to-neutral phases
+
+## Expected Robot Behavior
+
+After the system starts:
+
+- Webcam detects the user’s facial emotion  
+- Q-Learning selects the appropriate robot gesture  
+- NAO performs the full gesture smoothly  
+- Next detection begins only after finishing the previous gesture  
+
+
+
 
 ## Getting Started
-1. Clone this repository
-    ```bash
-    git clone https://github.com/Thanwarin/robot-webots.git
 
-2. Install required dependencies
-    ```bash
-    pip install -r requirements.txt
+### 1. Clone the repository
+```bash
+git clone https://github.com/Thanwarin/robot-webots.git
+```
+### 2. Install required Python dependencies
+```bash
+pip install -r requirements.txt
+```
+### 3. Download pretrained models
 
-3. Download pre-trained models
-
-  Place the following files in the same directory as nao_demo_python.py:
+Place these files in the same directory as nao_demo_python.py:
   - Emotion Recognition Model: [Download here](https://drive.google.com/file/d/1b8FfnHOdwUhxmWSe27iqqs89xyuAc-bc/view?usp=sharing)
   - NAO Q-Table (Tuned): [Download here](https://drive.google.com/file/d/16vVjgt81T-OkOC9KZ-iL4VJEDAYYSj9R/view?usp=sharing)
 
+### 4. Launch Webots with the controller
 
-4. Launch Webots and run the controller
-    ```bash
-    python nao_demo_python.py
+Set the controller of the NAO robot to:
 
-## Expected Behavior
+```bash
+nao_demo_python.py
+```
 
-Once the program runs:
-- The NAO robot detects your facial emotion through the webcam
-- The Q-Learning policy selects an appropriate gesture
-- NAO performs the gesture immediately
 
-Example mappings:
+Then run Webots or execute:
+```bash
+python nao_demo_python.py
+```
 
-Emotion	Gesture
-Happy	Happy Dance
-Surprise	Surprise Gesture
-Neutral / Angry / Sad	Corresponding expressive actions
-<p align="center"> <img width="450" alt="happy_dance_example" src="https://github.com/user-attachments/assets/7f2b1ae7-007d-4299-af1d-52d0995d295a" /> </p>
+### Example Gesture Image
+<p align="center">
+  <img width="450" src="https://github.com/user-attachments/assets/7f2b1ae7-007d-4299-af1d-52d0995d295a" alt="happy action"/>
+</p>
+
+
+
+## Robot Behavior & Gesture Mapping
+
+When the system is running, the NAO robot detects the user's facial emotion through the webcam and selects the appropriate gesture according to the Q-Learning policy. Each gesture is completed fully before the robot detects the next emotion.
+
+| Emotion             | Gesture                                                         | Example Image |
+|--------------------|-----------------------------------------------------------------|---------------|
+| **Happy**          | Raise both hands and look up (Happy Dance)                      | <img width="300" height="446" alt="image" src="https://github.com/user-attachments/assets/dd299bc7-c12a-44c1-821d-59a393651b33" />
+| **Sad**            | Lower head and shake head                                        | <img width="300" src="https://github.com/Thanwarin/robot-webots/blob/tmp/tmp/Part%202%20Chenran%20Shi/images/Sad.jpg" alt="Sad"/> |
+| **Angry**          | Stomp feet forcefully                                            | <img width="300" src="https://github.com/Thanwarin/robot-webots/blob/tmp/tmp/Part%202%20Chenran%20Shi/images/Angry.jpg" alt="Angry"/> |
+| **Surprise**       | Lift head with shocked posture / move arms and legs like surprised | <img width="300" src="https://github.com/Thanwarin/robot-webots/blob/tmp/tmp/Part%202%20Chenran%20Shi/images/Surprise.jpg" alt="Surprise"/> |
+| **Neutral / Scared** | Swing arms in place like a walking gesture                      | <img width="300" height="421" alt="image" src="https://github.com/user-attachments/assets/4bf696cd-fcce-431a-afe5-09d3f38f4ffc" />|
+
+**Key Improvements:**
+- NAO finishes each gesture before detecting the next emotion  
+- Adjusted center of gravity for improved stability  
+- Smooth transitions between gestures and reset-to-neutral phases
+
 
 ## Project Structure
 
-├── emotion_detection_fer.ipynb          # FER model training/testing  
+├── emotion_detection_fer.ipynb          # FER model training/testing (file)
 
-├── emotion_detection_DeepFace.ipynb     # DeepFace emotion detection demo  
+├── emotion_detection_DeepFace.ipynb     # DeepFace emotion detection demo (file)
 
-├── nao_demo_python.py                   # Main controller (Webcam + FER + Q-Learning + NAO actions) 
+├── nao_demo_python.py                   # Main controller (file)
 
-├── worlds/                              # Webots NAO simulation world  
+├── worlds/                              # Webots NAO simulation world (folder)
 
-└── controllers/                         # Webots controller files  
+└── controllers/                         # Webots controller files (folder)
+## System Improvements (Before vs After Update)
+
+### Before Updating
+- Vision model recognized 6 emotions, but robot performed only 1 gesture  
+- Robot frequently interrupted previous actions → unstable behavior  
+- Original Q-table: 5×5 but 6 emotion categories  
+
+### After Updating
+- Unified emotion categories (removed **disgust**)  
+- Rebuilt Q-table with correct number of states/actions  
+- Robot completes each action before detecting a new emotion  
+- Improved posture transitions and gesture fluidity  
+
+---
 
 ## References
-- Goodfellow et al., Challenges in Representation Learning, ICML 2013
-- Sutton & Barto, Reinforcement Learning: An Introduction, MIT Press, 2018
-- Aldebaran / SoftBank Robotics, NAO Humanoid Robot Documentation
-- O. Michel, Webots: Professional Mobile Robot Simulation, 2004
+
+- Abadi, M. et al., *TensorFlow: Large-Scale Machine Learning on Heterogeneous Systems*, 2015.
+- Aldebaran Robotics, *NAO Humanoid Robot Documentation*, SoftBank Robotics, 2014.
+- Borenstein, J. & Koren, Y., *Real-Time Obstacle Avoidance for Fast Mobile Robots*, IEEE Transactions on Systems, Man, and Cybernetics, vol. 19, no. 5, pp. 1179–1187, 1989.
+- Brooks, R. A., *A robust layered control system for a mobile robot*, IEEE Journal on Robotics and Automation, vol. 2, no. 1, pp. 14–23, 1986.
+- Breazeal, C., *Emotion and Sociable Humanoid Robots*, International Journal of Human Computer Studies, vol. 59, no. 1-2, pp. 119–155, 2003.
+- Da Silva, G. & Melo, F., *DeepFace: Facial recognition with deep learning*, in 2018 International Conference on Robotics and Automation, 2018, pp. 1–6.
+- Goodfellow, I. et al., *Challenges in Representation Learning: A Report on Three Machine Learning Contests*, ICML 2013 Workshop, 2013.
+- Guzzi, J., Cully, A., & Mouret, J. B., *Learning the behavior of a mobile robot using reinforcement learning in human-robot interaction*, IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 2013, pp. 2322–2327.
+- Lugaresi, L. et al., *MediaPipe: A Framework for Building Perception Pipelines*, arXiv:1906.08172, 2019.
+- Michel, P., Rohmer, E., & Singh, S. P., *Webots: Professional Mobile Robot Simulation*, International Journal of Advanced Robotic Systems, 2004.
+- Rohmer, E., Singh, S. P., & Freese, M., *Webots: a robot simulator for teaching and research*, International Journal of Advanced Robotic Systems, vol. 10, no. 3, pp. 1–10, 2013.
+- Shao, W., Zhang, L., & He, J., *Reinforcement learning for adaptive human-robot interaction*, Robotics and Autonomous Systems, vol. 124, pp. 103395, 2020.
+- Sutton, R. S. & Barto, A. G., *Reinforcement Learning: An Introduction*, 2nd Edition, MIT Press, 2018.
+- Tapus, A., Mataric, M. J., & Scassellati, B., *Socially assistive robotics [Grand challenges of robotics]*, IEEE Robotics & Automation Magazine, vol. 14, no. 1, pp. 35–42, 2007.
+ 
+
+---
 
 ## Acknowledgements
-- FER-2013 dataset
-- DeepFace library
-- Webots / NAO simulation tools
+
+- FER-2013 Dataset  
+- DeepFace Library  
+- Webots Simulation Tools  
+- NAO Humanoid Robot  
+
+
