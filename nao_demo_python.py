@@ -1,8 +1,4 @@
 """
-Module: LH/LM Intelligent Robotics (30227,30244)
-
-Description: 
-Final Controller for Coursework 2.
 Integrated Face Detection, Q-Learning Decision, and Motor Control.
 Note: Fixed the balance issue when resetting from Happy pose.
 """
@@ -13,6 +9,7 @@ import numpy as np
 import csv
 import time
 import math
+
 # Stop tensorflow logs, very annoying in console
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -26,7 +23,7 @@ import mediapipe as mp
 # ==============================================================================
 class Config:
     # --- System ---
-    TIME_STEP = 32
+    TIME_STEP = 32 # Simulation step time in ms
     WEBCAM_ID = 0  # Use 0 for default laptop camera
     
     # --- Files (Check paths!) ---
@@ -35,7 +32,7 @@ class Config:
     LOG_FILE = "mission_log_final.csv"
     
     # --- Thresholds ---
-    CONF_THRESH = 0.6
+    CONF_THRESH = 0.6 # Minimum confidence to trigger action
     
     # --- Balance Parameters ---
     # [Fix]: Added this offset to prevent falling backwards when resetting.
@@ -43,6 +40,7 @@ class Config:
     LEAN_FORWARD_OFFSET = -0.1 
     
     # --- Logic ---
+    # Actions corresponding to Q-learning states
     # 0:Patrol, 1:Happy, 2:Angry, 3:Sad, 4:Surprise
     ACTIONS = ['Patrol', 'Raise Hands', 'Stomp', 'Shake Head', 'Big Dance']
 
@@ -58,7 +56,6 @@ class NaoDriver:
         self.motors = {}
         
         # Define joints we need to control
-        # It's a long list...
         names = [
             "HeadYaw", "HeadPitch",
             "LShoulderPitch", "LShoulderRoll", "RShoulderPitch", "RShoulderRoll",
@@ -69,8 +66,7 @@ class NaoDriver:
         for n in names:
             self.motors[n] = self.robot.getDevice(n)
             
-        # Init Webcam
-        # We use external webcam because Webots camera simulation is slow on my laptop
+        # Initialize external webcam for speed (Webots camera is slow)
         self.cap = cv2.VideoCapture(Config.WEBCAM_ID)
         # Set low resolution for speed
         self.cap.set(3, 320)
@@ -131,6 +127,7 @@ class NaoBrain:
         self.writer.writerow(["Time", "Emotion", "Action", "Confidence"])
 
     def process_image(self, frame):
+        """Detect face and return cropped face image"""
         # Mediapipe process
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.mp_face.process(rgb)
@@ -154,6 +151,7 @@ class NaoBrain:
         return frame[y:y+bh, x:x+bw]
 
     def predict(self, face_img):
+        """Predict emotion and map to Q-learning state"""
         # Resize to 96x96 for model
         rz = cv2.resize(face_img, (96, 96))
         norm = rz.astype("float32") / 255.0
@@ -180,6 +178,7 @@ class NaoBrain:
         return raw_emo, st_idx, conf
 
     def get_action_from_q(self, st_idx):
+        """Return action index with highest Q value"""
         # Choose action with highest Q value
         return int(np.argmax(self.q_table[st_idx]))
 
@@ -189,6 +188,7 @@ class NaoBrain:
 # Connects Driver and Brain. Contains the Control Loop.
 # ==============================================================================
 def main():
+    """ Call all function"""
     driver = NaoDriver()
     brain = NaoBrain()
     
